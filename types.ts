@@ -13,7 +13,16 @@ export interface AttendanceRecord {
   date: string;
   checkIn: string;
   checkOut: string;
+  // Metadata for historical grouping
+  cycleMonth?: number;
+  cycleYear?: number;
 }
 
-export type ViewType = 'HOME' | 'ENTRY' | 'HISTORY';
+export interface Vacation {
+  id: string;
+  employeeId: string;
+  date: string; // dd/mm/yyyy
+}
+
+export type ViewType = 'HOME' | 'ENTRY' | 'HISTORY' | 'VACATIONS';
 export type ThemeType = 'LIGHT' | 'DARK' | 'GLASS' | 'EMERALD';

@@ -1,6 +1,6 @@
 
 import { DAYS_ARABIC } from './constants';
-import { AttendanceRecord } from './types';
+import { AttendanceRecord, Vacation } from './types';
 
 export const generateRandomTime = (startHour: number, startMin: number, endHour: number, endMin: number): string => {
   const start = startHour * 60 + startMin;
@@ -16,7 +16,13 @@ export const generateRandomTime = (startHour: number, startMin: number, endHour:
   return `${hourStr}:${m.toString().padStart(2, '0')} ${ampm}`;
 };
 
-export const generateAttendanceCycle = (startMonth: number, year: number, employeeId: string, employeeName: string): AttendanceRecord[] => {
+export const generateAttendanceCycle = (
+  startMonth: number, 
+  year: number, 
+  employeeId: string, 
+  employeeName: string,
+  vacations: Vacation[]
+): AttendanceRecord[] => {
   const records: AttendanceRecord[] = [];
   
   // Start from 21st of startMonth
@@ -25,9 +31,13 @@ export const generateAttendanceCycle = (startMonth: number, year: number, employ
   // End is 20th of next month
   const endDate = new Date(year, startMonth, 20);
 
+  const employeeVacations = vacations.filter(v => v.employeeId === employeeId);
+
   while (currentDate <= endDate) {
     const dayName = DAYS_ARABIC[currentDate.getDay()];
     const dateStr = currentDate.toLocaleDateString('en-GB'); // dd/mm/yyyy
+
+    const hasVacation = employeeVacations.some(v => v.date === dateStr);
 
     records.push({
       id: Math.random().toString(36).substr(2, 9),
@@ -35,8 +45,8 @@ export const generateAttendanceCycle = (startMonth: number, year: number, employ
       employeeName,
       day: dayName,
       date: dateStr,
-      checkIn: generateRandomTime(9, 0, 9, 45),
-      checkOut: generateRandomTime(16, 45, 18, 14),
+      checkIn: hasVacation ? 'اجازه' : generateRandomTime(9, 0, 9, 45),
+      checkOut: hasVacation ? 'سنويه' : generateRandomTime(16, 45, 18, 14),
     });
 
     currentDate.setDate(currentDate.getDate() + 1);
