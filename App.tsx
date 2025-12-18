@@ -23,11 +23,12 @@ import {
   Check,
   AlertCircle,
   Share2,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Filter
 } from 'lucide-react';
 import { Employee, AttendanceRecord, ViewType, ThemeType, Vacation } from './types';
 import { INITIAL_EMPLOYEES } from './constants';
-import { generateAttendanceCycle, copyToClipboard } from './utils';
+import { generateAttendanceCycle, copyToClipboard, getCycleLabel } from './utils';
 import * as XLSX from 'xlsx';
 
 export default function App() {
@@ -41,6 +42,7 @@ export default function App() {
 
   // Form States
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
+  const [vacationFilterId, setVacationFilterId] = useState('');
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [currentTable, setCurrentTable] = useState<AttendanceRecord[]>([]);
@@ -129,12 +131,7 @@ export default function App() {
 
   const handleTransfer = () => {
     if (currentTable.length === 0) return;
-    const recordsWithCycle = currentTable.map(r => ({
-      ...r,
-      cycleMonth: selectedMonth,
-      cycleYear: selectedYear
-    }));
-    setHistory([...history, ...recordsWithCycle]);
+    setHistory([...history, ...currentTable]);
     setCurrentTable([]);
     alert('تم الترحيل بنجاح إلى السجلات السابقة');
   };
@@ -186,6 +183,21 @@ export default function App() {
     });
     return groups;
   }, [history, historySearchName, historySearchDate]);
+
+  // Grouped Vacations Logic
+  const groupedVacations = useMemo(() => {
+    const filtered = vacationFilterId 
+      ? vacations.filter(v => v.employeeId === vacationFilterId)
+      : vacations;
+
+    const groups: { [key: string]: Vacation[] } = {};
+    filtered.forEach(v => {
+      const label = getCycleLabel(v.date);
+      if (!groups[label]) groups[label] = [];
+      groups[label].push(v);
+    });
+    return groups;
+  }, [vacations, vacationFilterId]);
 
   const handleExportGroup = (records: AttendanceRecord[], title: string) => {
     const data = records.map(r => ({
@@ -506,34 +518,70 @@ export default function App() {
 
           {view === 'VACATIONS' && (
             <div className="max-w-6xl mx-auto space-y-6 md:space-y-8 animate-in slide-in-from-bottom duration-500">
-              <h2 className="text-2xl md:text-4xl font-black flex items-center gap-4"><Plane className="text-indigo-600" size={32}/> إدارة الإجازات</h2>
+              <h2 className="text-2xl md:text-4xl font-black flex items-center gap-4"><Plane className="text-indigo-600" size={32}/> إجازات المنسقين والأشر</h2>
+              
               <div className={getCardClasses()}>
-                <div className="space-y-4 md:space-y-6">
-                  <label className="text-lg md:text-xl font-bold block">اختيار الموظف لتسجيل إجازة</label>
-                  <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
-                    <select value={selectedEmployeeId} onChange={(e) => setSelectedEmployeeId(e.target.value)} className="flex-1 p-3 md:p-4 bg-black/5 rounded-2xl text-black border-none outline-none focus:ring-1 focus:ring-indigo-500">
-                      <option value="">اختر الموظف...</option>
-                      {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name} ({emp.role})</option>)}
-                    </select>
-                    <button onClick={() => setIsVacationModalOpen(true)} className="w-full sm:w-auto px-10 py-3 md:py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-xl active:scale-95 transition-transform">تسجيل إجازة</button>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Step 1: Add Vacation */}
+                  <div className="space-y-4">
+                    <label className="text-lg font-bold block border-r-4 border-rose-500 pr-3">تسجيل إجازة جديدة</label>
+                    <div className="flex flex-col gap-3">
+                      <select value={selectedEmployeeId} onChange={(e) => setSelectedEmployeeId(e.target.value)} className="w-full p-3 md:p-4 bg-black/5 rounded-2xl text-black border-none outline-none focus:ring-2 focus:ring-rose-500">
+                        <option value="">اختر الموظف لإضافة إجازة...</option>
+                        {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name} ({emp.role})</option>)}
+                      </select>
+                      <button onClick={() => setIsVacationModalOpen(true)} className="w-full py-3 md:py-4 bg-rose-600 text-white rounded-2xl font-black shadow-xl active:scale-95 transition-transform">فتح شاشة إضافة التاريخ</button>
+                    </div>
+                  </div>
+
+                  {/* Step 2: Filter Vacations */}
+                  <div className="space-y-4">
+                    <label className="text-lg font-bold block border-r-4 border-indigo-500 pr-3">تصفية القائمة المعروضة</label>
+                    <div className="flex flex-col gap-3">
+                      <select value={vacationFilterId} onChange={(e) => setVacationFilterId(e.target.value)} className="w-full p-3 md:p-4 bg-black/5 rounded-2xl text-black border-none outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option value="">عرض إجازات جميع الموظفين</option>
+                        {employees.map(emp => <option key={emp.id} value={emp.id}>إجازات: {emp.name}</option>)}
+                      </select>
+                      <div className="p-3 bg-indigo-50 text-indigo-700 rounded-xl text-xs flex items-center gap-2">
+                         <Filter size={14}/> تصفية تلقائية عند الاختيار
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className={getCardClasses()}>
-                <h3 className="text-lg font-bold mb-4">قائمة الإجازات المجدولة</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
-                  {vacations.map(v => (
-                    <div key={v.id} className="p-3 md:p-4 bg-black/5 rounded-xl flex justify-between items-center border border-black/5 animate-in fade-in duration-300">
-                      <div>
-                        <p className="font-bold text-indigo-600 text-sm md:text-base">{employees.find(e => e.id === v.employeeId)?.name}</p>
-                        <p className="text-[10px] md:text-xs opacity-60 font-mono">{v.date}</p>
-                      </div>
-                      <button onClick={() => setVacations(vacations.filter(vac => vac.id !== v.id))} className="text-rose-500 p-2 hover:bg-rose-50 rounded-full active:scale-90 transition-colors"><Trash2 size={16}/></button>
+              {/* Grouped Scheduled Vacations */}
+              <div className="space-y-8">
+                {/* Fixed 'Property map does not exist on type unknown' error by explicitly casting Object.entries(groupedVacations) */}
+                {Object.keys(groupedVacations).length > 0 ? (Object.entries(groupedVacations) as [string, Vacation[]][]).map(([cycleLabel, vacs]) => (
+                  <div key={cycleLabel} className={getCardClasses()}>
+                    <h3 className="text-lg font-black mb-4 pb-2 border-b border-black/5 text-indigo-600 flex items-center gap-2">
+                      <Calendar size={20}/> {cycleLabel}
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {vacs.map(v => (
+                        <div key={v.id} className="p-3 md:p-4 bg-black/5 rounded-xl flex justify-between items-center border border-black/5 animate-in fade-in duration-300">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-black">
+                              {employees.find(e => e.id === v.employeeId)?.name.charAt(0)}
+                            </div>
+                            <div>
+                              <p className="font-bold text-sm md:text-base">{employees.find(e => e.id === v.employeeId)?.name}</p>
+                              <p className="text-[10px] md:text-xs opacity-60 font-mono">{v.date}</p>
+                            </div>
+                          </div>
+                          <button onClick={() => setVacations(vacations.filter(vac => vac.id !== v.id))} className="text-rose-500 p-2 hover:bg-rose-50 rounded-full active:scale-90 transition-colors">
+                            <Trash2 size={16}/>
+                          </button>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                  {vacations.length === 0 && <p className="col-span-full text-center opacity-40 italic py-6 md:py-10 text-sm">لا توجد إجازات مسجلة حالياً</p>}
-                </div>
+                  </div>
+                )) : (
+                  <div className={`${getCardClasses()} text-center opacity-40 italic py-12 text-lg`}>
+                    لا توجد إجازات مجدولة لهذه الفلترة حالياً
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -554,17 +602,27 @@ export default function App() {
                 <AlertCircle size={16} className="flex-shrink-0" />
                 <p>تنبيه: سيتم تسجيل هذا اليوم كـ "إجازة سنوية" تلقائياً عند توليد جدول الحضور لهذا الموظف.</p>
               </div>
+              <div className="p-3 bg-gray-50 rounded-xl">
+                 <p className="text-xs font-bold opacity-50 mb-1">الموظف المختار:</p>
+                 <p className="font-bold text-rose-600">{employees.find(e => e.id === selectedEmployeeId)?.name || 'لم يتم الاختيار'}</p>
+              </div>
               <div>
                 <label className="block text-xs font-bold mb-2 opacity-70 uppercase tracking-wider">التاريخ (يوم/شهر/سنة)</label>
                 <input 
                   type="text" 
-                  placeholder="25/11/2025" 
+                  placeholder="مثال: 25/01/2025" 
                   value={vacationDateInput} 
                   onChange={(e) => setVacationDateInput(e.target.value)} 
-                  className="w-full p-3 md:p-4 bg-gray-100 rounded-xl border-none outline-none focus:ring-2 focus:ring-indigo-500 text-black font-mono text-center"
+                  className="w-full p-3 md:p-4 bg-gray-100 rounded-xl border-none outline-none focus:ring-2 focus:ring-indigo-500 text-black font-mono text-center text-lg"
                 />
               </div>
-              <button onClick={handleAddVacation} className="w-full py-3 md:py-4 bg-indigo-600 text-white rounded-xl font-bold shadow-lg active:scale-95 transition-transform">تأكيد الإجازة</button>
+              <button 
+                onClick={handleAddVacation} 
+                disabled={!selectedEmployeeId}
+                className={`w-full py-3 md:py-4 rounded-xl font-bold shadow-lg active:scale-95 transition-transform ${selectedEmployeeId ? 'bg-indigo-600 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+              >
+                تأكيد الإجازة
+              </button>
             </div>
           </div>
         </div>
