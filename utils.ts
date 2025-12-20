@@ -21,14 +21,19 @@ export const parseDate = (dateStr: string): Date => {
   return new Date(year, month - 1, day);
 };
 
+export const formatDate = (date: Date): string => {
+  const d = date.getDate().toString().padStart(2, '0');
+  const m = (date.getMonth() + 1).toString().padStart(2, '0');
+  const y = date.getFullYear();
+  return `${d}/${m}/${y}`;
+};
+
 export const getCycleLabel = (dateStr: string): string => {
   const date = parseDate(dateStr);
   const day = date.getDate();
   const month = date.getMonth() + 1;
   const year = date.getFullYear();
 
-  // If day is 21 or more, it belongs to the cycle starting this month
-  // If day is 20 or less, it belongs to the cycle that started last month
   if (day >= 21) {
     const nextMonth = month === 12 ? 1 : month + 1;
     const nextYear = month === 12 ? year + 1 : year;
@@ -56,9 +61,9 @@ export const generateAttendanceCycle = (
 
   while (currentDate <= endDate) {
     const dayName = DAYS_ARABIC[currentDate.getDay()];
-    const dateStr = currentDate.toLocaleDateString('en-GB'); // dd/mm/yyyy
+    const dateStr = formatDate(currentDate);
 
-    const hasVacation = employeeVacations.some(v => v.date === dateStr);
+    const vacation = employeeVacations.find(v => v.date === dateStr);
 
     records.push({
       id: Math.random().toString(36).substr(2, 9),
@@ -66,8 +71,8 @@ export const generateAttendanceCycle = (
       employeeName,
       day: dayName,
       date: dateStr,
-      checkIn: hasVacation ? 'اجازه' : generateRandomTime(9, 0, 9, 45),
-      checkOut: hasVacation ? 'سنويه' : generateRandomTime(16, 45, 18, 14),
+      checkIn: vacation ? 'اجازه' : generateRandomTime(9, 0, 9, 45),
+      checkOut: vacation ? vacation.type : generateRandomTime(16, 45, 18, 14),
       cycleMonth: startMonth,
       cycleYear: year
     });
