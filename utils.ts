@@ -10,12 +10,11 @@ export const generateRandomTime = (startHour: number, startMin: number, endHour:
   let h = Math.floor(randomTotalMinutes / 60);
   const m = randomTotalMinutes % 60;
   
-  // تحويل لنظام 12 ساعة
-  const suffix = h >= 12 ? 'م' : 'ص';
+  // تحويل لنظام 12 ساعة عددي فقط بدون ص/م
   h = h % 12;
   h = h ? h : 12; // الساعة 0 تصبح 12
   
-  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')} ${suffix}`;
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
 };
 
 export const parseDate = (dateStr: string): Date => {
