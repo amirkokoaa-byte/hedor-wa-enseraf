@@ -60,13 +60,42 @@ export const generateAttendanceCycle = (
   const employeeVacations = vacations.filter(v => v.employeeId === employeeId);
 
   while (currentDate <= endDate) {
-    const dayName = DAYS_ARABIC[currentDate.getDay()];
+    const dayIndex = currentDate.getDay(); // 0 (Sun) to 6 (Sat)
+    const dayName = DAYS_ARABIC[dayIndex];
     const dateStr = formatDate(currentDate);
 
-    const vacation = employeeVacations.find(v => v.date === dateStr);
+    // 1. Check for manual vacations
+    const manualVacation = employeeVacations.find(v => v.date === dateStr);
     
-    // Custom Logic: If it's "غياب بإذن" or explicitly marked for deduction
-    const note = (vacation?.type === 'غياب بإذن' || vacation?.deductFromSalary) ? 'تخصم من الراتب' : '';
+    // 2. Check for fixed weekly holidays
+    let isWeeklyHoliday = false;
+    if (employeeName === 'اسماء صالح') {
+      if (dayIndex === 2) isWeeklyHoliday = true; // الثلاثاء
+    } else if (employeeName === 'ملك هيثم') {
+      if (dayIndex === 1) isWeeklyHoliday = true; // الاثنين
+    } else if (employeeName === 'امنيه اشرف') {
+      if (dayIndex === 0) isWeeklyHoliday = true; // الأحد
+    } else {
+      if (dayIndex === 5) isWeeklyHoliday = true; // الجمعة (الباقي)
+    }
+
+    let checkIn = "";
+    let checkOut = "";
+    let note = "";
+
+    if (manualVacation) {
+      checkIn = "اجازه";
+      checkOut = manualVacation.type;
+      note = manualVacation.deductFromSalary ? "تخصم من الراتب" : "";
+    } else if (isWeeklyHoliday) {
+      checkIn = "راحة إسبوعية";
+      checkOut = "-";
+      note = "";
+    } else {
+      checkIn = generateRandomTime(9, 0, 9, 45);
+      checkOut = generateRandomTime(16, 45, 18, 14);
+      note = "";
+    }
 
     records.push({
       id: Math.random().toString(36).substr(2, 9),
@@ -74,8 +103,8 @@ export const generateAttendanceCycle = (
       employeeName,
       day: dayName,
       date: dateStr,
-      checkIn: vacation ? 'اجازه' : generateRandomTime(9, 0, 9, 45),
-      checkOut: vacation ? vacation.type : generateRandomTime(16, 45, 18, 14),
+      checkIn,
+      checkOut,
       notes: note,
       cycleMonth: startMonth,
       cycleYear: year
