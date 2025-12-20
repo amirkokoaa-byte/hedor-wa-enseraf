@@ -237,6 +237,34 @@ export default function App() {
     XLSX.writeFile(workbook, `${title}.xlsx`);
   };
 
+  const handleExportVacations = () => {
+    const filtered = vacationFilterId 
+      ? vacations.filter(v => v.employeeId === vacationFilterId)
+      : vacations;
+
+    if (filtered.length === 0) {
+      alert('لا توجد إجازات للتصدير');
+      return;
+    }
+
+    const data = filtered.map(v => {
+      const emp = employees.find(e => e.id === v.employeeId);
+      return {
+        'اسم الموظف': emp?.name || 'غير معروف',
+        'التاريخ': v.date,
+        'النوع': 'إجازة سنوية'
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Vacations");
+    const filename = vacationFilterId 
+      ? `إجازات_${employees.find(e => e.id === vacationFilterId)?.name}.xlsx` 
+      : `كافة_الإجازات.xlsx`;
+    XLSX.writeFile(workbook, filename);
+  };
+
   const handleCopyGroup = (records: AttendanceRecord[]) => {
     const header = "اليوم\tالتاريخ\tالحضور\tالانصراف\n";
     const body = records.map(r => `${r.day}\t${r.date}\t${r.checkIn}\t${r.checkOut}`).join('\n');
@@ -558,13 +586,23 @@ export default function App() {
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <h2 className="text-2xl md:text-4xl font-black flex items-center gap-4"><Plane className="text-indigo-600" size={32}/> إجازات المنسقين والأشر</h2>
                 
-                {/* Save Button for Vacations */}
-                <button 
-                  onClick={handleSaveAll}
-                  className="w-full sm:w-auto flex items-center justify-center gap-3 bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black shadow-2xl hover:bg-emerald-700 active:scale-95 transition-all"
-                >
-                  <CloudUpload size={24}/> حفظ التعديلات الآن
-                </button>
+                <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                   {/* Export Vacations Button */}
+                   <button 
+                    onClick={handleExportVacations}
+                    className="flex items-center justify-center gap-3 bg-indigo-600 text-white px-6 py-4 rounded-2xl font-black shadow-2xl hover:bg-indigo-700 active:scale-95 transition-all"
+                  >
+                    <FileSpreadsheet size={24}/> تصدير الإجازات (Excel)
+                  </button>
+                  
+                  {/* Save Button for Vacations */}
+                  <button 
+                    onClick={handleSaveAll}
+                    className="flex items-center justify-center gap-3 bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black shadow-2xl hover:bg-emerald-700 active:scale-95 transition-all"
+                  >
+                    <CloudUpload size={24}/> حفظ كافة التغييرات
+                  </button>
+                </div>
               </div>
               
               <div className={getCardClasses()}>
