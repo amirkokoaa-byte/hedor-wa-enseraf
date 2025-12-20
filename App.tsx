@@ -24,7 +24,8 @@ import {
   AlertCircle,
   Share2,
   FileSpreadsheet,
-  Filter
+  Filter,
+  CloudUpload
 } from 'lucide-react';
 import { Employee, AttendanceRecord, ViewType, ThemeType, Vacation } from './types';
 import { INITIAL_EMPLOYEES } from './constants';
@@ -39,6 +40,7 @@ export default function App() {
   const [vacations, setVacations] = useState<Vacation[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 1024);
+  const [saveStatus, setSaveStatus] = useState<boolean>(false);
 
   // Form States
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
@@ -62,6 +64,20 @@ export default function App() {
   const [historySearchName, setHistorySearchName] = useState('');
   const [historySearchDate, setHistorySearchDate] = useState('');
 
+  // Load Data from LocalStorage on Mount
+  useEffect(() => {
+    const savedEmployees = localStorage.getItem('sr_employees');
+    const savedHistory = localStorage.getItem('sr_history');
+    const savedVacations = localStorage.getItem('sr_vacations');
+    const savedTheme = localStorage.getItem('sr_theme');
+
+    if (savedEmployees) setEmployees(JSON.parse(savedEmployees));
+    if (savedHistory) setHistory(JSON.parse(savedHistory));
+    if (savedVacations) setVacations(JSON.parse(savedVacations));
+    if (savedTheme) setTheme(savedTheme as ThemeType);
+  }, []);
+
+  // Timer and Resize handlers
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     const handleResize = () => {
@@ -74,6 +90,16 @@ export default function App() {
       window.removeEventListener('resize', handleResize);
     };
   }, []);
+
+  const handleSaveAll = () => {
+    localStorage.setItem('sr_employees', JSON.stringify(employees));
+    localStorage.setItem('sr_history', JSON.stringify(history));
+    localStorage.setItem('sr_vacations', JSON.stringify(vacations));
+    localStorage.setItem('sr_theme', theme);
+    
+    setSaveStatus(true);
+    setTimeout(() => setSaveStatus(false), 2000);
+  };
 
   const changeView = (newView: ViewType) => {
     setView(newView);
@@ -165,7 +191,7 @@ export default function App() {
     setVacations([...vacations, newVacation]);
     setIsVacationModalOpen(false);
     setVacationDateInput('');
-    alert('تمت إضافة الإجازة بنجاح');
+    alert('تمت إضافة الإجازة بنجاح - لا تنسى الضغط على زر الحفظ النهائي');
   };
 
   const groupedHistory = useMemo(() => {
@@ -184,7 +210,6 @@ export default function App() {
     return groups;
   }, [history, historySearchName, historySearchDate]);
 
-  // Grouped Vacations Logic
   const groupedVacations = useMemo(() => {
     const filtered = vacationFilterId 
       ? vacations.filter(v => v.employeeId === vacationFilterId)
@@ -239,6 +264,13 @@ export default function App() {
 
   return (
     <div className={`${getThemeClasses()} flex flex-col h-screen overflow-hidden`}>
+      {/* Save Notification */}
+      {saveStatus && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[200] bg-emerald-600 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-2 animate-bounce">
+          <Check size={20}/> تم حفظ جميع البيانات بنجاح!
+        </div>
+      )}
+
       {/* Header */}
       <header className={`${getHeaderClasses()} p-3 md:p-4 flex justify-between items-center sticky top-0 z-50 transition-colors shadow-md`}>
         <div className="flex items-center gap-2 md:gap-4">
@@ -330,6 +362,11 @@ export default function App() {
                 <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
                   <button onClick={() => changeView('VACATIONS')} className="flex-1 px-8 py-3 md:py-4 bg-indigo-600 text-white rounded-2xl font-bold shadow-lg active:scale-95 transition-transform">إدارة الإجازات</button>
                   <button onClick={() => changeView('ENTRY')} className="flex-1 px-8 py-3 md:py-4 bg-rose-600 text-white rounded-2xl font-bold shadow-lg active:scale-95 transition-transform">تسجيل الحضور</button>
+                </div>
+                <div className="mt-8 border-t pt-6 flex justify-center">
+                   <button onClick={handleSaveAll} className="flex items-center gap-2 bg-emerald-600/20 text-emerald-600 hover:bg-emerald-600 hover:text-white px-8 py-3 rounded-full font-bold transition-all active:scale-95">
+                     <Save size={18}/> حفظ كافة التغييرات الحالية
+                   </button>
                 </div>
               </div>
             </div>
@@ -517,8 +554,18 @@ export default function App() {
           )}
 
           {view === 'VACATIONS' && (
-            <div className="max-w-6xl mx-auto space-y-6 md:space-y-8 animate-in slide-in-from-bottom duration-500">
-              <h2 className="text-2xl md:text-4xl font-black flex items-center gap-4"><Plane className="text-indigo-600" size={32}/> إجازات المنسقين والأشر</h2>
+            <div className="max-w-6xl mx-auto space-y-6 md:space-y-8 animate-in slide-in-from-bottom duration-500 pb-24">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <h2 className="text-2xl md:text-4xl font-black flex items-center gap-4"><Plane className="text-indigo-600" size={32}/> إجازات المنسقين والأشر</h2>
+                
+                {/* Save Button for Vacations */}
+                <button 
+                  onClick={handleSaveAll}
+                  className="w-full sm:w-auto flex items-center justify-center gap-3 bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black shadow-2xl hover:bg-emerald-700 active:scale-95 transition-all"
+                >
+                  <CloudUpload size={24}/> حفظ التعديلات الآن
+                </button>
+              </div>
               
               <div className={getCardClasses()}>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -552,7 +599,6 @@ export default function App() {
 
               {/* Grouped Scheduled Vacations */}
               <div className="space-y-8">
-                {/* Fixed 'Property map does not exist on type unknown' error by explicitly casting Object.entries(groupedVacations) */}
                 {Object.keys(groupedVacations).length > 0 ? (Object.entries(groupedVacations) as [string, Vacation[]][]).map(([cycleLabel, vacs]) => (
                   <div key={cycleLabel} className={getCardClasses()}>
                     <h3 className="text-lg font-black mb-4 pb-2 border-b border-black/5 text-indigo-600 flex items-center gap-2">
