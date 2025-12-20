@@ -60,6 +60,12 @@
         .mobile-hide { display: none; }
         input[type="text"], select { font-size: 0.9rem !important; }
       }
+
+      /* Allow text selection in tables even if global select is limited */
+      .selectable-table {
+        user-select: text !important;
+        -webkit-user-select: text !important;
+      }
     </style>
     <script type="importmap">
     {
@@ -73,7 +79,7 @@
     }
     </script>
   </head>
-  <body class="antialiased select-none">
+  <body class="antialiased">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>

@@ -43,6 +43,7 @@ export default function App() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 1024);
   const [saveStatus, setSaveStatus] = useState<boolean>(false);
+  const [copyFeedback, setCopyFeedback] = useState<boolean>(false);
 
   // Form States
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
@@ -95,6 +96,24 @@ export default function App() {
         const table = generateAttendanceCycle(selectedMonth, selectedYear, emp.id, emp.name, vacations);
         setCurrentTable(table);
       }
+    }
+  };
+
+  const handleCopyTableData = async () => {
+    if (currentTable.length === 0) return;
+    
+    const empName = employees.find(e => e.id === selectedEmployeeId)?.name || "غير معروف";
+    let textToCopy = `اسم الموظف: ${empName}\n`;
+    textToCopy += `اليوم\tالتاريخ\tالحضور\tالانصراف\tالملاحظات\n`;
+    
+    currentTable.forEach(row => {
+      textToCopy += `${row.day}\t${row.date}\t${row.checkIn}\t${row.checkOut}\t${row.notes || ""}\n`;
+    });
+
+    const success = await copyToClipboard(textToCopy);
+    if (success) {
+      setCopyFeedback(true);
+      setTimeout(() => setCopyFeedback(false), 2000);
     }
   };
 
@@ -172,33 +191,14 @@ export default function App() {
     alert('تم الترحيل للأرشيف بنجاح');
   };
 
-  // Improved Excel Export with required formatting
   const exportAttendanceExcel = (data: AttendanceRecord[], employeeName: string) => {
-    // 1. Prepare Header (Only Employee Name)
     const header = [[`اسم الموظف: ${employeeName}`], []];
-    
-    // 2. Table Headers
     const columns = [["اليوم", "التاريخ", "الحضور", "الانصراف", "الملاحظات"]];
-    
-    // 3. Table Rows
     const rows = data.map(r => [r.day, r.date, r.checkIn, r.checkOut, r.notes || ""]);
-    
     const combined = [...header, ...columns, ...rows];
     const ws = XLSX.utils.aoa_to_sheet(combined);
-    
-    // 4. Set Column Widths (Auto-fit logic)
-    const wscols = [
-      { wch: 15 }, // Day
-      { wch: 15 }, // Date
-      { wch: 15 }, // Check-in
-      { wch: 15 }, // Check-out
-      { wch: 30 }  // Notes
-    ];
+    const wscols = [ { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 30 } ];
     ws['!cols'] = wscols;
-
-    // Note: Style properties (Borders, Fonts, Alignment) require XLSX styles extensions or Pro.
-    // We provide a clean structure that Excel will interpret as a standard table.
-    
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Attendance");
     XLSX.writeFile(wb, `SoftRose_${employeeName}.xlsx`);
@@ -290,6 +290,12 @@ export default function App() {
           <Check size={20}/> تم حفظ جميع البيانات ومزامنة الجدول!
         </div>
       )}
+      
+      {copyFeedback && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[200] bg-indigo-600 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-top duration-300">
+          <Copy size={20}/> تم نسخ بيانات الجدول للحافظة!
+        </div>
+      )}
 
       {/* Header */}
       <header className={`bg-rose-600 text-white p-3 md:p-4 flex justify-between items-center sticky top-0 z-50 shadow-md`}>
@@ -377,12 +383,17 @@ export default function App() {
 
           {view === 'ENTRY' && (
             <div className="max-w-6xl mx-auto space-y-6 animate-in slide-in-from-right">
-              <div className="flex justify-between items-center">
+              <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
                 <h2 className="text-3xl font-black">تسجيل الحضور والانصراف</h2>
                 {currentTable.length > 0 && (
-                  <button onClick={handleExportEntryTable} className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:bg-emerald-700 shadow-lg active:scale-95 transition-all">
-                    <FileSpreadsheet size={20}/> تصدير ملف إكسيل
-                  </button>
+                  <div className="flex gap-2 w-full sm:w-auto">
+                    <button onClick={handleCopyTableData} className="flex-1 sm:flex-none bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-indigo-700 shadow-lg active:scale-95 transition-all">
+                      <Copy size={20}/> نسخ البيانات
+                    </button>
+                    <button onClick={handleExportEntryTable} className="flex-1 sm:flex-none bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-700 shadow-lg active:scale-95 transition-all">
+                      <FileSpreadsheet size={20}/> تصدير Excel
+                    </button>
+                  </div>
                 )}
               </div>
               
@@ -421,7 +432,7 @@ export default function App() {
                     </div>
                     <button onClick={handleTransfer} className="bg-rose-600 text-white px-8 py-2 rounded-xl font-bold active:scale-95 shadow-sm">ترحيل للأرشيف</button>
                   </div>
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto selectable-table">
                     <table className="w-full text-center border-collapse">
                       <thead className="bg-black/5 text-xs">
                         <tr>
@@ -517,7 +528,7 @@ export default function App() {
                    <input type="date" onChange={e => setHistorySelectedDate(e.target.value)} className="w-full p-4 bg-black/5 rounded-2xl outline-none text-black" />
                    <div className="mt-6 space-y-4">
                       {filteredAttendance.length > 0 ? (
-                        <div className="overflow-x-auto">
+                        <div className="overflow-x-auto selectable-table">
                           <table className="w-full text-xs text-center border-collapse">
                             <thead className="bg-black/5">
                               <tr><th className="p-2 border">الموظف</th><th className="p-2 border">ح</th><th className="p-2 border">ص</th><th className="p-2 border">ملاحظات</th></tr>
@@ -657,7 +668,7 @@ export default function App() {
       )}
 
       <footer className="bg-black/5 border-t p-3 text-center text-[10px] opacity-40 shrink-0">
-        SOFT ROSE MANAGEMENT SYSTEM &bull; v2.8 &copy; 2025
+        SOFT ROSE MANAGEMENT SYSTEM &bull; v2.9 &copy; 2025
       </footer>
     </div>
   );
