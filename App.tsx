@@ -55,6 +55,7 @@ export default function App() {
 
   // Vacation Modal States
   const [isVacationModalOpen, setIsVacationModalOpen] = useState(false);
+  const [editingVacationId, setEditingVacationId] = useState<string | null>(null);
   const [startDateInput, setStartDateInput] = useState(formatDate(new Date()));
   const [endDateInput, setEndDateInput] = useState(formatDate(new Date()));
   const [vacationType, setVacationType] = useState<VacationType>('سنوي');
@@ -91,9 +92,43 @@ export default function App() {
     setTimeout(() => setSaveStatus(false), 2000);
   };
 
+  const openVacationModal = (vac?: Vacation) => {
+    if (vac) {
+      // Edit mode
+      setEditingVacationId(vac.id);
+      setStartDateInput(vac.date);
+      setEndDateInput(vac.date);
+      setVacationType(vac.type);
+      setDeductFromSalary(vac.deductFromSalary);
+      setSelectedEmployeeId(vac.employeeId);
+    } else {
+      // New mode
+      setEditingVacationId(null);
+      setStartDateInput(formatDate(new Date()));
+      setEndDateInput(formatDate(new Date()));
+      setVacationType('سنوي');
+      setDeductFromSalary(false);
+    }
+    setIsVacationModalOpen(true);
+  };
+
   const handleAddVacation = () => {
     if (!selectedEmployeeId || !startDateInput || !endDateInput) {
       alert('يرجى التأكد من اختيار الموظف والتواريخ');
+      return;
+    }
+
+    if (editingVacationId) {
+      // Single edit logic
+      setVacations(vacations.map(v => v.id === editingVacationId ? {
+        ...v,
+        date: startDateInput,
+        type: vacationType,
+        deductFromSalary,
+        employeeId: selectedEmployeeId
+      } : v));
+      setIsVacationModalOpen(false);
+      alert('تم تحديث الإجازة بنجاح! تذكر الحفظ النهائي.');
       return;
     }
 
@@ -120,7 +155,13 @@ export default function App() {
 
     setVacations([...vacations, ...newVacs]);
     setIsVacationModalOpen(false);
-    alert(`تم تسجيل ${newVacs.length} أيام إجازة بنجاح!`);
+    alert(`تم تسجيل ${newVacs.length} أيام إجازة بنجاح! لا تنسى الضغط على زر حفظ التعديلات.`);
+  };
+
+  const handleDeleteVacation = (id: string) => {
+    if (confirm('هل أنت متأكد من حذف هذه الإجازة؟')) {
+      setVacations(vacations.filter(v => v.id !== id));
+    }
   };
 
   const handleTransfer = () => {
@@ -149,7 +190,6 @@ export default function App() {
   };
 
   // Grouping Vacations by Cycle for History View
-  // Added explicit Record type to fix potential unknown inference issues in Object.entries
   const historyVacationsGrouped = useMemo((): Record<string, Vacation[]> => {
     if (!historySelectedEmployeeId) return {};
     
@@ -168,7 +208,9 @@ export default function App() {
   // Attendance history filtered by date
   const filteredAttendance = useMemo(() => {
     if (!historySelectedDate) return [];
-    return history.filter(h => h.date === historySelectedDate);
+    const [year, month, day] = historySelectedDate.split('-');
+    const formattedDate = `${day}/${month}/${year}`;
+    return history.filter(h => h.date === formattedDate);
   }, [history, historySelectedDate]);
 
   return (
@@ -315,7 +357,12 @@ export default function App() {
 
           {view === 'HISTORY' && (
             <div className="max-w-6xl mx-auto space-y-8 animate-in slide-in-from-left">
-              <h2 className="text-3xl font-black">الأرشيف والسجلات المتقدمة</h2>
+              <div className="flex justify-between items-center">
+                <h2 className="text-3xl font-black">الأرشيف والسجلات المتقدمة</h2>
+                <button onClick={handleSaveAll} className="bg-emerald-600 text-white px-6 py-2 rounded-xl font-bold flex items-center gap-2 active:scale-95">
+                  <CloudUpload size={18}/> حفظ التعديلات
+                </button>
+              </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Search by Employee */}
@@ -331,23 +378,34 @@ export default function App() {
                   </select>
 
                   <div className="mt-6 space-y-4">
-                    {/* Fixed type inference for Object.entries and vacs */}
                     {Object.entries(historyVacationsGrouped).map(([label, vacs]) => (
                       <div key={label} className="p-4 bg-black/5 rounded-2xl border-r-4 border-indigo-500">
                         <h4 className="font-bold text-sm mb-3">{label}</h4>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {(vacs as Vacation[]).map(v => (
-                            <div key={v.id} className="text-[10px] bg-white p-2 rounded-lg shadow-sm border border-black/5 flex flex-col items-center">
-                              <span className="font-bold text-rose-600">{v.date}</span>
-                              <span className="opacity-60">{v.type}</span>
-                              {v.deductFromSalary && <span className="text-[8px] bg-rose-100 text-rose-700 px-1 rounded">خصم</span>}
+                            <div key={v.id} className="text-[11px] bg-white p-3 rounded-xl shadow-sm border border-black/5 flex flex-col gap-2 relative group text-black">
+                              <div className="flex justify-between items-start">
+                                <div className="flex flex-col">
+                                  <span className="font-bold text-rose-600 text-xs">{v.date}</span>
+                                  <span className="opacity-70">{v.type}</span>
+                                </div>
+                                <div className="flex gap-1">
+                                  <button onClick={() => openVacationModal(v)} title="تعديل" className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-colors">
+                                    <Edit2 size={12}/>
+                                  </button>
+                                  <button onClick={() => handleDeleteVacation(v.id)} title="حذف" className="p-1.5 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition-colors">
+                                    <Trash2 size={12}/>
+                                  </button>
+                                </div>
+                              </div>
+                              {v.deductFromSalary && <span className="inline-block self-start text-[8px] bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full font-bold">يخصم من الراتب</span>}
                             </div>
                           ))}
                         </div>
                       </div>
                     ))}
                     {historySelectedEmployeeId && Object.keys(historyVacationsGrouped).length === 0 && (
-                      <p className="text-center opacity-40 italic">لا توجد إجازات مسجلة لهذا الموظف</p>
+                      <div className="p-10 text-center opacity-40 italic">لا توجد إجازات مسجلة لهذا الموظف</div>
                     )}
                   </div>
                 </div>
@@ -358,8 +416,7 @@ export default function App() {
                    <input 
                     type="date" 
                     onChange={e => {
-                      const d = new Date(e.target.value);
-                      setHistorySelectedDate(formatDate(d));
+                      setHistorySelectedDate(e.target.value);
                     }}
                     className="w-full p-4 bg-black/5 rounded-2xl outline-none text-black"
                    />
@@ -383,7 +440,7 @@ export default function App() {
                           </table>
                         </div>
                       ) : (
-                        historySelectedDate && <p className="text-center opacity-40 italic">لم يتم ترحيل سجلات لهذا اليوم</p>
+                        historySelectedDate && <div className="p-10 text-center opacity-40 italic">لم يتم ترحيل سجلات لهذا اليوم</div>
                       )}
                    </div>
                 </div>
@@ -395,9 +452,14 @@ export default function App() {
             <div className="max-w-6xl mx-auto space-y-8 animate-in slide-in-from-bottom">
               <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
                 <h2 className="text-3xl font-black flex items-center gap-3"><Plane size={32} className="text-indigo-600"/> سجل الإجازات</h2>
-                <button onClick={() => setIsVacationModalOpen(true)} className="w-full sm:w-auto bg-indigo-600 text-white px-10 py-4 rounded-2xl font-black shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2">
-                  <Plus size={24}/> تسجيل إجازة جديدة
-                </button>
+                <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                  <button onClick={handleSaveAll} className="flex-1 sm:flex-none bg-emerald-600 text-white px-6 py-4 rounded-2xl font-bold shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2">
+                    <CloudUpload size={20}/> حفظ التعديلات
+                  </button>
+                  <button onClick={() => openVacationModal()} className="flex-1 sm:flex-none bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2">
+                    <Plus size={24}/> تسجيل إجازة جديدة
+                  </button>
+                </div>
               </div>
 
               <div className={getCardClasses()}>
@@ -413,7 +475,7 @@ export default function App() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {vacations.filter(v => vacationFilterId ? v.employeeId === vacationFilterId : true).map(v => (
-                    <div key={v.id} className="p-4 bg-black/5 rounded-2xl flex justify-between items-center border border-black/5 group">
+                    <div key={v.id} className="p-4 bg-black/5 rounded-2xl flex justify-between items-center border border-black/5 group hover:border-indigo-200 transition-colors">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-black">
                           {employees.find(e => e.id === v.employeeId)?.name.charAt(0)}
@@ -421,17 +483,33 @@ export default function App() {
                         <div>
                           <p className="font-bold text-sm">{employees.find(e => e.id === v.employeeId)?.name}</p>
                           <div className="flex gap-2 items-center text-[10px] opacity-60">
-                            <span className="font-mono">{v.date}</span>
-                            <span className="bg-white px-2 py-0.5 rounded shadow-sm">{v.type}</span>
-                            {v.deductFromSalary && <span className="text-rose-500 font-bold">خصم</span>}
+                            <span className="font-mono bg-white px-1.5 rounded border border-black/5">{v.date}</span>
+                            <span className="bg-white px-2 py-0.5 rounded shadow-sm text-indigo-600 font-bold">{v.type}</span>
+                            {v.deductFromSalary && <span className="text-rose-500 font-bold px-1.5 bg-rose-50 rounded">خصم</span>}
                           </div>
                         </div>
                       </div>
-                      <button onClick={() => setVacations(vacations.filter(vac => vac.id !== v.id))} className="text-rose-400 p-2 hover:bg-rose-50 rounded-full group-hover:scale-110 transition-transform">
-                        <Trash2 size={16}/>
-                      </button>
+                      <div className="flex gap-1">
+                        <button 
+                          onClick={() => openVacationModal(v)} 
+                          title="تعديل الإجازة"
+                          className="p-2.5 bg-indigo-50 text-indigo-500 rounded-xl hover:bg-indigo-100 hover:text-indigo-600 transition-all active:scale-90"
+                        >
+                          <Edit2 size={16}/>
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteVacation(v.id)} 
+                          title="حذف الإجازة"
+                          className="p-2.5 bg-rose-50 text-rose-500 rounded-xl hover:bg-rose-100 hover:text-rose-600 transition-all active:scale-90"
+                        >
+                          <Trash2 size={16}/>
+                        </button>
+                      </div>
                     </div>
                   ))}
+                  {vacations.length === 0 && (
+                    <div className="col-span-full py-20 text-center opacity-30 italic">لا توجد سجلات إجازة لعرضها</div>
+                  )}
                 </div>
               </div>
             </div>
@@ -445,28 +523,34 @@ export default function App() {
           <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={() => setIsVacationModalOpen(false)}></div>
           <div className={`${getCardClasses()} w-full max-w-xl relative animate-in zoom-in duration-300 border-indigo-500/30 border-2 bg-white text-gray-900 shadow-2xl overflow-hidden`}>
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-2xl font-black text-indigo-600">تسجيل طلب إجازة</h3>
-              <button onClick={() => setIsVacationModalOpen(false)} className="p-2 hover:bg-black/5 rounded-full"><X size={24}/></button>
+              <h3 className="text-2xl font-black text-indigo-600">{editingVacationId ? 'تعديل بيانات الإجازة' : 'تسجيل طلب إجازة'}</h3>
+              <button onClick={() => setIsVacationModalOpen(false)} className="p-2 hover:bg-black/5 rounded-full transition-colors"><X size={24}/></button>
             </div>
             
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-xs font-bold opacity-60">من تاريخ</label>
+                  <label className="text-xs font-bold opacity-60">{editingVacationId ? 'التاريخ' : 'من تاريخ'}</label>
                   <input 
                     type="date" 
-                    onChange={e => setStartDateInput(formatDate(new Date(e.target.value)))}
-                    className="w-full p-4 bg-gray-100 rounded-2xl outline-none font-bold text-center"
+                    value={editingVacationId ? startDateInput.split('/').reverse().join('-') : undefined}
+                    onChange={e => {
+                      const formatted = formatDate(new Date(e.target.value));
+                      setStartDateInput(formatted);
+                    }}
+                    className="w-full p-4 bg-gray-100 rounded-2xl outline-none font-bold text-center focus:ring-2 ring-indigo-500 transition-all"
                   />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold opacity-60">حتى تاريخ</label>
-                  <input 
-                    type="date" 
-                    onChange={e => setEndDateInput(formatDate(new Date(e.target.value)))}
-                    className="w-full p-4 bg-gray-100 rounded-2xl outline-none font-bold text-center"
-                  />
-                </div>
+                {!editingVacationId && (
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold opacity-60">حتى تاريخ</label>
+                    <input 
+                      type="date" 
+                      onChange={e => setEndDateInput(formatDate(new Date(e.target.value)))}
+                      className="w-full p-4 bg-gray-100 rounded-2xl outline-none font-bold text-center focus:ring-2 ring-indigo-500 transition-all"
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -476,7 +560,7 @@ export default function App() {
                     <button 
                       key={t}
                       onClick={() => setVacationType(t)}
-                      className={`py-3 rounded-xl text-sm font-bold transition-all ${vacationType === t ? 'bg-indigo-600 text-white scale-105' : 'bg-gray-100 text-gray-500'}`}
+                      className={`py-3 rounded-xl text-sm font-bold transition-all ${vacationType === t ? 'bg-indigo-600 text-white scale-105 shadow-lg' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
                     >
                       {t}
                     </button>
@@ -499,7 +583,7 @@ export default function App() {
 
               <div className="space-y-2">
                 <label className="text-xs font-bold opacity-60">اختر الموظف</label>
-                <select value={selectedEmployeeId} onChange={e => setSelectedEmployeeId(e.target.value)} className="w-full p-4 bg-gray-100 rounded-2xl outline-none font-bold text-black">
+                <select value={selectedEmployeeId} onChange={e => setSelectedEmployeeId(e.target.value)} className="w-full p-4 bg-gray-100 rounded-2xl outline-none font-bold text-black focus:ring-2 ring-indigo-500 transition-all">
                   <option value="">-- اختر الموظف --</option>
                   {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
                 </select>
@@ -508,9 +592,9 @@ export default function App() {
               <button 
                 onClick={handleAddVacation}
                 disabled={!selectedEmployeeId}
-                className={`w-full py-4 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all ${selectedEmployeeId ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
+                className={`w-full py-4 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all ${selectedEmployeeId ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
               >
-                تأكيد وتسجيل الفترة
+                {editingVacationId ? 'حفظ التغييرات الجديدة' : 'تأكيد وتسجيل الفترة'}
               </button>
             </div>
           </div>
