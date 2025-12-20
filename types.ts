@@ -13,6 +13,7 @@ export interface AttendanceRecord {
   date: string;
   checkIn: string;
   checkOut: string;
+  notes?: string;
   cycleMonth?: number;
   cycleYear?: number;
 }

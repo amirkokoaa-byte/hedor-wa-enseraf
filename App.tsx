@@ -26,7 +26,8 @@ import {
   CloudUpload,
   ArrowLeftRight,
   ShieldCheck,
-  WalletCards
+  WalletCards,
+  FileDown
 } from 'lucide-react';
 import { Employee, AttendanceRecord, ViewType, ThemeType, Vacation, VacationType } from './types';
 import { INITIAL_EMPLOYEES } from './constants';
@@ -94,7 +95,6 @@ export default function App() {
 
   const openVacationModal = (vac?: Vacation) => {
     if (vac) {
-      // Edit mode
       setEditingVacationId(vac.id);
       setStartDateInput(vac.date);
       setEndDateInput(vac.date);
@@ -102,7 +102,6 @@ export default function App() {
       setDeductFromSalary(vac.deductFromSalary);
       setSelectedEmployeeId(vac.employeeId);
     } else {
-      // New mode
       setEditingVacationId(null);
       setStartDateInput(formatDate(new Date()));
       setEndDateInput(formatDate(new Date()));
@@ -119,7 +118,6 @@ export default function App() {
     }
 
     if (editingVacationId) {
-      // Single edit logic
       setVacations(vacations.map(v => v.id === editingVacationId ? {
         ...v,
         date: startDateInput,
@@ -171,6 +169,85 @@ export default function App() {
     alert('تم الترحيل للأرشيف بنجاح');
   };
 
+  // Specialized Excel Export Helper
+  const exportAttendanceExcel = (data: AttendanceRecord[], employeeName: string, title: string) => {
+    const header = [[`اسم الموظف: ${employeeName}`], [`${title}`], []];
+    const columns = [["اليوم", "التاريخ", "الحضور", "الانصراف", "الملاحظات"]];
+    const rows = data.map(r => [r.day, r.date, r.checkIn, r.checkOut, r.notes || ""]);
+    
+    const combined = [...header, ...columns, ...rows];
+    const ws = XLSX.utils.aoa_to_sheet(combined);
+    
+    // Auto-width adjustment
+    const wscols = [
+      {wch: 15}, // اليوم
+      {wch: 15}, // التاريخ
+      {wch: 15}, // الحضور
+      {wch: 15}, // الانصراف
+      {wch: 25}  // الملاحظات
+    ];
+    ws['!cols'] = wscols;
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Attendance");
+    XLSX.writeFile(wb, `SoftRose_${employeeName}_${new Date().toLocaleDateString()}.xlsx`);
+  };
+
+  const handleExportEntryTable = () => {
+    if (currentTable.length === 0) return alert("لا توجد بيانات لتصديرها");
+    const empName = employees.find(e => e.id === selectedEmployeeId)?.name || "غير معروف";
+    exportAttendanceExcel(currentTable, empName, `سجل حضور وانصراف - شهر ${selectedMonth}`);
+  };
+
+  const handleExportHistoryDate = () => {
+    if (filteredAttendance.length === 0) return alert("لا توجد سجلات لهذا التاريخ");
+    const wsData = [
+      [`سجل حضور وانصراف بتاريخ: ${historySelectedDate}`],
+      [],
+      ["الموظف", "الحضور", "الانصراف", "الملاحظات"]
+    ];
+    filteredAttendance.forEach(a => {
+      wsData.push([a.employeeName, a.checkIn, a.checkOut, a.notes || ""]);
+    });
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "AttendanceHistory");
+    XLSX.writeFile(wb, `Attendance_History_${historySelectedDate}.xlsx`);
+  };
+
+  const handleExportVacations = () => {
+    const list = vacations.filter(v => vacationFilterId ? v.employeeId === vacationFilterId : true);
+    if (list.length === 0) return alert("لا توجد إجازات لتصديرها");
+    
+    const wsData = [
+      ["سجل الإجازات"],
+      [],
+      ["الموظف", "التاريخ", "النوع", "ملاحظات"]
+    ];
+    list.forEach(v => {
+      const emp = employees.find(e => e.id === v.employeeId);
+      wsData.push([emp?.name || "غير معروف", v.date, v.type, v.deductFromSalary ? "تخصم من الراتب" : ""]);
+    });
+    
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "VacationsList");
+    XLSX.writeFile(wb, `SoftRose_Vacations_${new Date().toLocaleDateString()}.xlsx`);
+  };
+
+  const handleExportEmployeeList = () => {
+    const wsData = [
+      ["قائمة موظفي SOFT ROSE"],
+      [],
+      ["المعرف", "الاسم", "الوظيفة"]
+    ];
+    employees.forEach(e => wsData.push([e.id, e.name, e.role]));
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Employees");
+    XLSX.writeFile(wb, "SoftRose_Employees.xlsx");
+  };
+
   const getThemeClasses = () => {
     switch (theme) {
       case 'DARK': return 'theme-dark min-h-screen text-white';
@@ -189,23 +266,18 @@ export default function App() {
     }
   };
 
-  // Grouping Vacations by Cycle for History View
   const historyVacationsGrouped = useMemo((): Record<string, Vacation[]> => {
     if (!historySelectedEmployeeId) return {};
-    
     const empVacs = vacations.filter(v => v.employeeId === historySelectedEmployeeId);
     const groups: Record<string, Vacation[]> = {};
-    
     empVacs.forEach(v => {
       const label = getCycleLabel(v.date);
       if (!groups[label]) groups[label] = [];
       groups[label].push(v);
     });
-    
     return groups;
   }, [vacations, historySelectedEmployeeId]);
 
-  // Attendance history filtered by date
   const filteredAttendance = useMemo(() => {
     if (!historySelectedDate) return [];
     const [year, month, day] = historySelectedDate.split('-');
@@ -245,32 +317,36 @@ export default function App() {
       </header>
 
       <div className="flex flex-1 overflow-hidden relative">
-        {/* Sidebar */}
         <aside className={`
           fixed lg:relative h-full z-40 transition-all duration-300
           ${sidebarOpen ? 'w-64 sm:w-72 translate-x-0' : 'w-0 -translate-x-full lg:translate-x-0'}
           bg-white/5 backdrop-blur-md border-l border-black/5 flex-shrink-0 overflow-hidden
         `}>
           <nav className="p-4 space-y-2 h-full">
-            <button onClick={() => setView('HOME')} className={`w-full flex items-center gap-4 p-4 rounded-2xl ${view === 'HOME' ? 'bg-rose-600 text-white' : 'hover:bg-black/5'}`}>
+            <button onClick={() => setView('HOME')} className={`w-full flex items-center gap-4 p-4 rounded-2xl ${view === 'HOME' ? 'bg-rose-600 text-white shadow-lg' : 'hover:bg-black/5'}`}>
               <Home size={20} /> <span className="font-bold">الصفحة الرئيسية</span>
             </button>
-            <button onClick={() => setView('ENTRY')} className={`w-full flex items-center gap-4 p-4 rounded-2xl ${view === 'ENTRY' ? 'bg-rose-600 text-white' : 'hover:bg-black/5'}`}>
+            <button onClick={() => setView('ENTRY')} className={`w-full flex items-center gap-4 p-4 rounded-2xl ${view === 'ENTRY' ? 'bg-rose-600 text-white shadow-lg' : 'hover:bg-black/5'}`}>
               <Users size={20} /> <span className="font-bold">حضور وانصراف</span>
             </button>
-            <button onClick={() => setView('HISTORY')} className={`w-full flex items-center gap-4 p-4 rounded-2xl ${view === 'HISTORY' ? 'bg-rose-600 text-white' : 'hover:bg-black/5'}`}>
+            <button onClick={() => setView('HISTORY')} className={`w-full flex items-center gap-4 p-4 rounded-2xl ${view === 'HISTORY' ? 'bg-rose-600 text-white shadow-lg' : 'hover:bg-black/5'}`}>
               <History size={20} /> <span className="font-bold">الأرشيف والسجلات</span>
             </button>
-            <button onClick={() => setView('VACATIONS')} className={`w-full flex items-center gap-4 p-4 rounded-2xl ${view === 'VACATIONS' ? 'bg-indigo-600 text-white' : 'hover:bg-black/5'}`}>
+            <button onClick={() => setView('VACATIONS')} className={`w-full flex items-center gap-4 p-4 rounded-2xl ${view === 'VACATIONS' ? 'bg-indigo-600 text-white shadow-lg' : 'hover:bg-black/5'}`}>
               <Plane size={20} /> <span className="font-bold">إجازات الموظفين</span>
             </button>
           </nav>
         </aside>
 
-        {/* Main */}
         <main className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6">
           {view === 'HOME' && (
              <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in zoom-in">
+               <div className="flex justify-between items-center">
+                  <h2 className="text-3xl font-black">نظرة عامة</h2>
+                  <button onClick={handleExportEmployeeList} className="bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-all">
+                    <FileDown size={18}/> تصدير قائمة الموظفين
+                  </button>
+               </div>
                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                   <div className={getCardClasses()}>
                     <p className="opacity-70 text-sm">الموظفين</p>
@@ -297,6 +373,15 @@ export default function App() {
 
           {view === 'ENTRY' && (
             <div className="max-w-6xl mx-auto space-y-6 animate-in slide-in-from-right">
+              <div className="flex justify-between items-center">
+                <h2 className="text-3xl font-black">تسجيل الحضور والانصراف</h2>
+                {currentTable.length > 0 && (
+                  <button onClick={handleExportEntryTable} className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:bg-emerald-700 shadow-lg active:scale-95 transition-all">
+                    <FileSpreadsheet size={20}/> تصدير ملف إكسيل
+                  </button>
+                )}
+              </div>
+              
               <div className={getCardClasses()}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-4">
@@ -326,13 +411,22 @@ export default function App() {
               {currentTable.length > 0 && (
                 <div className={`${getCardClasses()} !p-0 overflow-hidden`}>
                   <div className="p-4 border-b border-black/5 flex justify-between items-center">
-                    <h3 className="font-black text-lg">مراجعة بيانات الحضور</h3>
-                    <button onClick={handleTransfer} className="bg-emerald-600 text-white px-8 py-2 rounded-xl font-bold active:scale-95">ترحيل للأرشيف</button>
+                    <div className="flex flex-col">
+                      <h3 className="font-black text-lg">مراجعة بيانات الحضور</h3>
+                      <p className="text-xs opacity-60">اسم الموظف: {employees.find(e => e.id === selectedEmployeeId)?.name}</p>
+                    </div>
+                    <button onClick={handleTransfer} className="bg-rose-600 text-white px-8 py-2 rounded-xl font-bold active:scale-95">ترحيل للأرشيف</button>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-center border-collapse">
                       <thead className="bg-black/5 text-xs">
-                        <tr><th className="p-4">اليوم</th><th className="p-4">التاريخ</th><th className="p-4">الحضور</th><th className="p-4">الانصراف</th></tr>
+                        <tr>
+                          <th className="p-4">اليوم</th>
+                          <th className="p-4">التاريخ</th>
+                          <th className="p-4">الحضور</th>
+                          <th className="p-4">الانصراف</th>
+                          <th className="p-4">الملاحظات</th>
+                        </tr>
                       </thead>
                       <tbody>
                         {currentTable.map((row, idx) => (
@@ -345,6 +439,11 @@ export default function App() {
                             <td className="p-2"><input type="text" value={row.checkOut} onChange={e => {
                               const up = [...currentTable]; up[idx].checkOut = e.target.value; setCurrentTable(up);
                             }} className="w-full text-center p-2 bg-black/5 rounded-lg text-black outline-none focus:bg-white" /></td>
+                            <td className="p-2">
+                              <span className={`text-[10px] font-bold ${row.notes ? 'text-rose-600' : 'opacity-40'}`}>
+                                {row.notes || "-"}
+                              </span>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -359,13 +458,17 @@ export default function App() {
             <div className="max-w-6xl mx-auto space-y-8 animate-in slide-in-from-left">
               <div className="flex justify-between items-center">
                 <h2 className="text-3xl font-black">الأرشيف والسجلات المتقدمة</h2>
-                <button onClick={handleSaveAll} className="bg-emerald-600 text-white px-6 py-2 rounded-xl font-bold flex items-center gap-2 active:scale-95">
-                  <CloudUpload size={18}/> حفظ التعديلات
-                </button>
+                <div className="flex gap-2">
+                  <button onClick={handleExportHistoryDate} className="bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-all">
+                    <Download size={18}/> تصدير التاريخ الحالي
+                  </button>
+                  <button onClick={handleSaveAll} className="bg-emerald-600 text-white px-6 py-2 rounded-xl font-bold flex items-center gap-2 active:scale-95">
+                    <CloudUpload size={18}/> حفظ التعديلات
+                  </button>
+                </div>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Search by Employee */}
                 <div className={getCardClasses()}>
                   <label className="block font-bold mb-4 flex items-center gap-2 text-indigo-600"><Users size={20}/> بحث عن إجازات موظف</label>
                   <select 
@@ -410,7 +513,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Search by Date */}
                 <div className={getCardClasses()}>
                    <label className="block font-bold mb-4 flex items-center gap-2 text-rose-600"><Calendar size={20}/> بحث في سجلات الحضور بالتاريخ</label>
                    <input 
@@ -426,7 +528,7 @@ export default function App() {
                         <div className="overflow-x-auto">
                           <table className="w-full text-xs text-center">
                             <thead className="bg-black/5">
-                              <tr><th className="p-2">الموظف</th><th className="p-2">ح</th><th className="p-2">ص</th></tr>
+                              <tr><th className="p-2">الموظف</th><th className="p-2">ح</th><th className="p-2">ص</th><th className="p-2">ملاحظات</th></tr>
                             </thead>
                             <tbody>
                               {filteredAttendance.map(a => (
@@ -434,6 +536,7 @@ export default function App() {
                                   <td className="p-2 font-bold">{a.employeeName}</td>
                                   <td className="p-2">{a.checkIn}</td>
                                   <td className="p-2">{a.checkOut}</td>
+                                  <td className="p-2 text-[8px] text-rose-600 font-bold">{a.notes || "-"}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -452,11 +555,14 @@ export default function App() {
             <div className="max-w-6xl mx-auto space-y-8 animate-in slide-in-from-bottom">
               <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
                 <h2 className="text-3xl font-black flex items-center gap-3"><Plane size={32} className="text-indigo-600"/> سجل الإجازات</h2>
-                <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-                  <button onClick={handleSaveAll} className="flex-1 sm:flex-none bg-emerald-600 text-white px-6 py-4 rounded-2xl font-bold shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2">
+                <div className="flex flex-wrap gap-3 w-full sm:w-auto">
+                  <button onClick={handleExportVacations} className="bg-indigo-50 text-indigo-600 px-6 py-4 rounded-2xl font-bold border border-indigo-200 shadow-md hover:bg-indigo-100 transition-all flex items-center justify-center gap-2">
+                    <FileDown size={20}/> تصدير الإجازات
+                  </button>
+                  <button onClick={handleSaveAll} className="bg-emerald-600 text-white px-6 py-4 rounded-2xl font-bold shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2">
                     <CloudUpload size={20}/> حفظ التعديلات
                   </button>
-                  <button onClick={() => openVacationModal()} className="flex-1 sm:flex-none bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2">
+                  <button onClick={() => openVacationModal()} className="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2">
                     <Plus size={24}/> تسجيل إجازة جديدة
                   </button>
                 </div>
@@ -490,18 +596,10 @@ export default function App() {
                         </div>
                       </div>
                       <div className="flex gap-1">
-                        <button 
-                          onClick={() => openVacationModal(v)} 
-                          title="تعديل الإجازة"
-                          className="p-2.5 bg-indigo-50 text-indigo-500 rounded-xl hover:bg-indigo-100 hover:text-indigo-600 transition-all active:scale-90"
-                        >
+                        <button onClick={() => openVacationModal(v)} title="تعديل الإجازة" className="p-2.5 bg-indigo-50 text-indigo-500 rounded-xl hover:bg-indigo-100 transition-all active:scale-90">
                           <Edit2 size={16}/>
                         </button>
-                        <button 
-                          onClick={() => handleDeleteVacation(v.id)} 
-                          title="حذف الإجازة"
-                          className="p-2.5 bg-rose-50 text-rose-500 rounded-xl hover:bg-rose-100 hover:text-rose-600 transition-all active:scale-90"
-                        >
+                        <button onClick={() => handleDeleteVacation(v.id)} title="حذف الإجازة" className="p-2.5 bg-rose-50 text-rose-500 rounded-xl hover:bg-rose-100 transition-all active:scale-90">
                           <Trash2 size={16}/>
                         </button>
                       </div>

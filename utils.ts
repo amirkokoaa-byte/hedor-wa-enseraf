@@ -64,6 +64,9 @@ export const generateAttendanceCycle = (
     const dateStr = formatDate(currentDate);
 
     const vacation = employeeVacations.find(v => v.date === dateStr);
+    
+    // Custom Logic: If it's "غياب بإذن" or explicitly marked for deduction
+    const note = (vacation?.type === 'غياب بإذن' || vacation?.deductFromSalary) ? 'تخصم من الراتب' : '';
 
     records.push({
       id: Math.random().toString(36).substr(2, 9),
@@ -73,6 +76,7 @@ export const generateAttendanceCycle = (
       date: dateStr,
       checkIn: vacation ? 'اجازه' : generateRandomTime(9, 0, 9, 45),
       checkOut: vacation ? vacation.type : generateRandomTime(16, 45, 18, 14),
+      notes: note,
       cycleMonth: startMonth,
       cycleYear: year
     });
