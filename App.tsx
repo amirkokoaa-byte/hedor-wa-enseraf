@@ -367,13 +367,13 @@ export default function App() {
                     <h4 className="text-4xl font-black">{history.length}</h4>
                   </div>
                   <div className={getCardClasses()}>
-                    <p className="opacity-70 text-sm">الإجازات</p>
+                    <p className="opacity-70 text-sm">إجمالي الإجازات</p>
                     <h4 className="text-4xl font-black">{vacations.length}</h4>
                   </div>
                </div>
                <div className={getCardClasses()}>
                   <h2 className="text-3xl font-black mb-4">أهلاً بك في نظام SOFT ROSE</h2>
-                  <p className="opacity-80 mb-8 leading-relaxed">نظام متكامل لإدارة الحضور والانصراف مع دعم العطلات الأسبوعية المخصصة.</p>
+                  <p className="opacity-80 mb-8 leading-relaxed">نظام متكامل لإدارة الحضور والانصراف مع دعم العطلات الأسبوعية المخصصة ونظام الوقت 12 ساعة.</p>
                   <button onClick={handleSaveAll} className="flex items-center gap-2 bg-emerald-600 text-white px-8 py-3 rounded-2xl font-bold shadow-lg active:scale-95 transition-all">
                     <Save size={20}/> حفظ ومزامنة البيانات
                   </button>
@@ -427,7 +427,7 @@ export default function App() {
                 <div className={`${getCardClasses()} !p-0 overflow-hidden`}>
                   <div className="p-4 border-b border-black/5 flex justify-between items-center">
                     <div className="flex flex-col">
-                      <h3 className="font-black text-lg">مراجعة بيانات الحضور</h3>
+                      <h3 className="font-black text-lg">مراجعة بيانات الحضور (نظام 12 ساعة)</h3>
                       <p className="text-xs opacity-60">الموظف: {employees.find(e => e.id === selectedEmployeeId)?.name}</p>
                     </div>
                     <button onClick={handleTransfer} className="bg-rose-600 text-white px-8 py-2 rounded-xl font-bold active:scale-95 shadow-sm">ترحيل للأرشيف</button>
@@ -668,7 +668,7 @@ export default function App() {
       )}
 
       <footer className="bg-black/5 border-t p-3 text-center text-[10px] opacity-40 shrink-0">
-        SOFT ROSE MANAGEMENT SYSTEM &bull; v2.9 &copy; 2025
+        SOFT ROSE MANAGEMENT SYSTEM &bull; v3.0 &copy; 2025
       </footer>
     </div>
   );
