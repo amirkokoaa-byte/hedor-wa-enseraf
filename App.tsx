@@ -20,15 +20,11 @@ import {
   Edit2,
   Check,
   AlertCircle,
-  Share2,
   FileSpreadsheet,
-  Filter,
   CloudUpload,
-  ArrowLeftRight,
-  ShieldCheck,
-  WalletCards,
   FileDown,
-  Clock
+  Clock,
+  WalletCards
 } from 'lucide-react';
 import { Employee, AttendanceRecord, ViewType, ThemeType, Vacation, VacationType } from './types';
 import { INITIAL_EMPLOYEES } from './constants';
@@ -41,7 +37,6 @@ export default function App() {
   const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
   const [history, setHistory] = useState<AttendanceRecord[]>([]);
   const [vacations, setVacations] = useState<Vacation[]>([]);
-  const [currentTime, setCurrentTime] = useState(new Date());
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 1024);
   const [saveStatus, setSaveStatus] = useState<boolean>(false);
   const [copyFeedback, setCopyFeedback] = useState<boolean>(false);
@@ -63,7 +58,6 @@ export default function App() {
 
   // History Filter States
   const [historySelectedEmployeeId, setHistorySelectedEmployeeId] = useState('');
-  const [historySelectedDate, setHistorySelectedDate] = useState('');
 
   // Load Data
   useEffect(() => {
@@ -78,11 +72,6 @@ export default function App() {
     if (savedTheme) setTheme(savedTheme as ThemeType);
   }, []);
 
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
   const handleSaveAll = () => {
     localStorage.setItem('sr_employees', JSON.stringify(employees));
     localStorage.setItem('sr_history', JSON.stringify(history));
@@ -91,6 +80,7 @@ export default function App() {
     setSaveStatus(true);
     setTimeout(() => setSaveStatus(false), 2000);
     
+    // إعادة تحديث الجدول الحالي إذا كان معروضاً ليعكس أي تغيير في الإجازات
     if (selectedEmployeeId && currentTable.length > 0) {
       const emp = employees.find(e => e.id === selectedEmployeeId);
       if (emp) {
@@ -102,15 +92,11 @@ export default function App() {
 
   const handleCopyTableData = async () => {
     if (currentTable.length === 0) return;
-    
     const empName = employees.find(e => e.id === selectedEmployeeId)?.name || "غير معروف";
-    let textToCopy = `اسم الموظف: ${empName}\n`;
-    textToCopy += `اليوم\tالتاريخ\tالحضور\tالانصراف\tالملاحظات\n`;
-    
+    let textToCopy = `اسم الموظف: ${empName}\nاليوم\tالتاريخ\tالحضور\tالانصراف\tالملاحظات\n`;
     currentTable.forEach(row => {
       textToCopy += `${row.day}\t${row.date}\t${row.checkIn}\t${row.checkOut}\t${row.notes || ""}\n`;
     });
-
     const success = await copyToClipboard(textToCopy);
     if (success) {
       setCopyFeedback(true);
@@ -156,7 +142,6 @@ export default function App() {
 
     const start = parseDate(startDateInput);
     const end = parseDate(endDateInput);
-
     if (start > end) {
       alert('تاريخ البداية لا يمكن أن يكون بعد تاريخ النهاية');
       return;
@@ -189,6 +174,7 @@ export default function App() {
     if (currentTable.length === 0) return;
     setHistory([...history, ...currentTable]);
     setCurrentTable([]);
+    handleSaveAll(); // حفظ تلقائي عند الترحيل
     alert('تم الترحيل للأرشيف بنجاح');
   };
 
@@ -198,53 +184,10 @@ export default function App() {
     const rows = data.map(r => [r.day, r.date, r.checkIn, r.checkOut, r.notes || ""]);
     const combined = [...header, ...columns, ...rows];
     const ws = XLSX.utils.aoa_to_sheet(combined);
-    const wscols = [ { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 30 } ];
-    ws['!cols'] = wscols;
+    ws['!cols'] = [{ wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 30 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Attendance");
     XLSX.writeFile(wb, `SoftRose_${employeeName}.xlsx`);
-  };
-
-  const handleExportEntryTable = () => {
-    if (currentTable.length === 0) return alert("لا توجد بيانات لتصديرها");
-    const empName = employees.find(e => e.id === selectedEmployeeId)?.name || "غير معروف";
-    exportAttendanceExcel(currentTable, empName);
-  };
-
-  const handleExportHistoryDate = () => {
-    if (filteredAttendance.length === 0) return alert("لا توجد سجلات لهذا التاريخ");
-    const wsData = [
-      [`سجل حضور وانصراف بتاريخ: ${historySelectedDate}`],
-      [],
-      ["الموظف", "الحضور", "الانصراف", "الملاحظات"]
-    ];
-    filteredAttendance.forEach(a => {
-      wsData.push([a.employeeName, a.checkIn, a.checkOut, a.notes || ""]);
-    });
-    const ws = XLSX.utils.aoa_to_sheet(wsData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "AttendanceHistory");
-    XLSX.writeFile(wb, `Attendance_History_${historySelectedDate}.xlsx`);
-  };
-
-  const handleExportVacations = () => {
-    const list = vacations.filter(v => vacationFilterId ? v.employeeId === vacationFilterId : true);
-    if (list.length === 0) return alert("لا توجد إجازات لتصديرها");
-    
-    const wsData = [
-      ["سجل الإجازات"],
-      [],
-      ["الموظف", "التاريخ", "النوع", "ملاحظات"]
-    ];
-    list.forEach(v => {
-      const emp = employees.find(e => e.id === v.employeeId);
-      wsData.push([emp?.name || "غير معروف", v.date, v.type, v.deductFromSalary ? "تخصم من الراتب" : ""]);
-    });
-    
-    const ws = XLSX.utils.aoa_to_sheet(wsData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "VacationsList");
-    XLSX.writeFile(wb, `SoftRose_Vacations_${new Date().toLocaleDateString()}.xlsx`);
   };
 
   const getThemeClasses = () => {
@@ -265,7 +208,7 @@ export default function App() {
     }
   };
 
-  // Group Archived Attendance records by cycle for the selected employee
+  // تجميع سجلات الأرشيف حسب الدورة للموظف المختار
   const historyAttendanceGrouped = useMemo((): Record<string, AttendanceRecord[]> => {
     if (!historySelectedEmployeeId) return {};
     const empHistory = history.filter(h => h.employeeId === historySelectedEmployeeId);
@@ -278,25 +221,6 @@ export default function App() {
     return groups;
   }, [history, historySelectedEmployeeId]);
 
-  const historyVacationsGrouped = useMemo((): Record<string, Vacation[]> => {
-    if (!historySelectedEmployeeId) return {};
-    const empVacs = vacations.filter(v => v.employeeId === historySelectedEmployeeId);
-    const groups: Record<string, Vacation[]> = {};
-    empVacs.forEach(v => {
-      const label = getCycleLabel(v.date);
-      if (!groups[label]) groups[label] = [];
-      groups[label].push(v);
-    });
-    return groups;
-  }, [vacations, historySelectedEmployeeId]);
-
-  const filteredAttendance = useMemo(() => {
-    if (!historySelectedDate) return [];
-    const [year, month, day] = historySelectedDate.split('-');
-    const formattedDate = `${day}/${month}/${year}`;
-    return history.filter(h => h.date === formattedDate);
-  }, [history, historySelectedDate]);
-
   return (
     <div className={`${getThemeClasses()} flex flex-col h-screen overflow-hidden`}>
       {saveStatus && (
@@ -306,8 +230,8 @@ export default function App() {
       )}
       
       {copyFeedback && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[200] bg-indigo-600 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-top duration-300">
-          <Copy size={20}/> تم نسخ بيانات الجدول للحافظة!
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[200] bg-indigo-600 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-2">
+          <Copy size={20}/> تم نسخ بيانات الجدول!
         </div>
       )}
 
@@ -358,38 +282,22 @@ export default function App() {
         <main className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6">
           {view === 'HOME' && (
              <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in zoom-in">
-               <div className="flex justify-between items-center">
-                  <h2 className="text-3xl font-black">نظرة عامة</h2>
-                  <button onClick={() => {
-                      const wsData = [["قائمة موظفي SOFT ROSE"], [], ["المعرف", "الاسم", "الوظيفة"]];
-                      employees.forEach(e => wsData.push([e.id, e.name, e.role]));
-                      const ws = XLSX.utils.aoa_to_sheet(wsData);
-                      const wb = XLSX.utils.book_new();
-                      XLSX.utils.book_append_sheet(wb, ws, "Employees");
-                      XLSX.writeFile(wb, "SoftRose_Employees.xlsx");
-                  }} className="bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-md">
-                    <FileDown size={18}/> تصدير الموظفين
-                  </button>
-               </div>
-               <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+               <h2 className="text-3xl font-black">نظرة عامة</h2>
+               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div className={getCardClasses()}>
-                    <p className="opacity-70 text-sm">الموظفين</p>
+                    <p className="opacity-70 text-sm">إجمالي الموظفين</p>
                     <h4 className="text-4xl font-black">{employees.length}</h4>
                   </div>
                   <div className={getCardClasses()}>
-                    <p className="opacity-70 text-sm">إجمالي السجلات</p>
-                    <h4 className="text-4xl font-black">{history.length}</h4>
-                  </div>
-                  <div className={getCardClasses()}>
-                    <p className="opacity-70 text-sm">إجمالي الإجازات</p>
+                    <p className="opacity-70 text-sm">إجمالي الإجازات المسجلة</p>
                     <h4 className="text-4xl font-black">{vacations.length}</h4>
                   </div>
                </div>
                <div className={getCardClasses()}>
-                  <h2 className="text-3xl font-black mb-4">أهلاً بك في نظام SOFT ROSE</h2>
-                  <p className="opacity-80 mb-8 leading-relaxed">نظام متكامل لإدارة الحضور والانصراف مع دعم العطلات الأسبوعية المخصصة ونظام الوقت 12 ساعة.</p>
+                  <h2 className="text-3xl font-black mb-4">أهلاً بك في SOFT ROSE</h2>
+                  <p className="opacity-80 mb-8 leading-relaxed">نظام إداري متطور لمزامنة الحضور والانصراف مع سجلات الإجازات والأرشيف.</p>
                   <button onClick={handleSaveAll} className="flex items-center gap-2 bg-emerald-600 text-white px-8 py-3 rounded-2xl font-bold shadow-lg active:scale-95 transition-all">
-                    <Save size={20}/> حفظ ومزامنة البيانات
+                    <Save size={20}/> حفظ ومزامنة جميع البيانات
                   </button>
                </div>
              </div>
@@ -402,9 +310,12 @@ export default function App() {
                 {currentTable.length > 0 && (
                   <div className="flex gap-2 w-full sm:w-auto">
                     <button onClick={handleCopyTableData} className="flex-1 sm:flex-none bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-indigo-700 shadow-lg active:scale-95 transition-all">
-                      <Copy size={20}/> نسخ البيانات
+                      <Copy size={20}/> نسخ الجدول
                     </button>
-                    <button onClick={handleExportEntryTable} className="flex-1 sm:flex-none bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-700 shadow-lg active:scale-95 transition-all">
+                    <button onClick={() => {
+                        const empName = employees.find(e => e.id === selectedEmployeeId)?.name || "غير معروف";
+                        exportAttendanceExcel(currentTable, empName);
+                    }} className="flex-1 sm:flex-none bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-700 shadow-lg active:scale-95 transition-all">
                       <FileSpreadsheet size={20}/> تصدير Excel
                     </button>
                   </div>
@@ -414,21 +325,21 @@ export default function App() {
               <div className={getCardClasses()}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-4">
-                    <label className="font-bold flex items-center gap-2 text-rose-500"><UserCheck size={20}/> الموظف</label>
+                    <label className="font-bold flex items-center gap-2 text-rose-500"><UserCheck size={20}/> اختيار الموظف</label>
                     <select value={selectedEmployeeId} onChange={(e) => setSelectedEmployeeId(e.target.value)} className="w-full p-4 bg-black/5 rounded-2xl outline-none text-black">
                       <option value="">اختر موظف...</option>
                       {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
                     </select>
                   </div>
                   <div className="space-y-4">
-                    <label className="font-bold flex items-center gap-2 text-rose-500"><CalendarDays size={20}/> شهر الدورة</label>
+                    <label className="font-bold flex items-center gap-2 text-rose-500"><CalendarDays size={20}/> دورة الشهر</label>
                     <div className="flex gap-2">
                       <select value={selectedMonth} onChange={(e) => setSelectedMonth(Number(e.target.value))} className="flex-1 p-4 bg-black/5 rounded-2xl outline-none text-black">
-                        {Array.from({length: 12}, (_, i) => i + 1).map(m => <option key={m} value={m}>دورة شهر {m}</option>)}
+                        {Array.from({length: 12}, (_, i) => i + 1).map(m => <option key={m} value={m}>دورة {m}</option>)}
                       </select>
                       <button onClick={() => {
                         const emp = employees.find(e => e.id === selectedEmployeeId);
-                        if (!emp) return alert('اختر موظف');
+                        if (!emp) return alert('يرجى اختيار موظف أولاً');
                         const table = generateAttendanceCycle(selectedMonth, selectedYear, emp.id, emp.name, vacations);
                         setCurrentTable(table);
                       }} className="bg-rose-600 text-white px-8 rounded-2xl font-bold active:scale-95 shadow-md">انشيء الجدول</button>
@@ -440,10 +351,7 @@ export default function App() {
               {currentTable.length > 0 && (
                 <div className={`${getCardClasses()} !p-0 overflow-hidden`}>
                   <div className="p-4 border-b border-black/5 flex justify-between items-center">
-                    <div className="flex flex-col">
-                      <h3 className="font-black text-lg">مراجعة بيانات الحضور (نظام 12 ساعة)</h3>
-                      <p className="text-xs opacity-60">الموظف: {employees.find(e => e.id === selectedEmployeeId)?.name}</p>
-                    </div>
+                    <h3 className="font-black text-lg">مراجعة بيانات الجدول</h3>
                     <button onClick={handleTransfer} className="bg-rose-600 text-white px-8 py-2 rounded-xl font-bold active:scale-95 shadow-sm">ترحيل للأرشيف</button>
                   </div>
                   <div className="overflow-x-auto selectable-table">
@@ -459,25 +367,25 @@ export default function App() {
                       </thead>
                       <tbody>
                         {currentTable.map((row, idx) => {
-                          const isWeeklyHoliday = row.checkIn === 'اجازه' && row.checkOut === 'اسبوعيه';
+                          const isHoliday = row.checkIn === 'اجازه';
                           return (
-                            <tr key={idx} className={`border-b border-black/5 text-sm transition-colors ${isWeeklyHoliday ? 'bg-gray-200 text-gray-900' : ''}`}>
-                              <td className={`p-4 font-bold border ${isWeeklyHoliday ? 'bg-gray-300' : ''}`}>{row.day}</td>
-                              <td className={`p-4 opacity-70 border ${isWeeklyHoliday ? 'bg-gray-300' : ''}`} dir="ltr">{row.date}</td>
-                              <td className={`p-2 border ${isWeeklyHoliday ? 'bg-gray-300' : ''}`}>
+                            <tr key={idx} className={`border-b border-black/5 text-sm transition-colors ${isHoliday ? 'bg-gray-100 text-gray-500 italic' : ''}`}>
+                              <td className="p-4 font-bold border">{row.day}</td>
+                              <td className="p-4 opacity-70 border" dir="ltr">{row.date}</td>
+                              <td className="p-2 border">
                                   <input type="text" value={row.checkIn} onChange={e => {
                                       const up = [...currentTable]; up[idx].checkIn = e.target.value; setCurrentTable(up);
-                                  }} className={`w-full text-center p-2 rounded-lg outline-none focus:bg-white border transition-colors ${isWeeklyHoliday ? 'bg-gray-400 border-gray-500 text-gray-950 font-black' : 'bg-black/5 border-transparent'}`} />
+                                  }} className="w-full text-center p-2 rounded-lg bg-black/5 border-transparent outline-none focus:bg-white focus:border-rose-300 transition-all" />
                               </td>
-                              <td className={`p-2 border ${isWeeklyHoliday ? 'bg-gray-300' : ''}`}>
+                              <td className="p-2 border">
                                   <input type="text" value={row.checkOut} onChange={e => {
                                       const up = [...currentTable]; up[idx].checkOut = e.target.value; setCurrentTable(up);
-                                  }} className={`w-full text-center p-2 rounded-lg border outline-none focus:bg-white transition-colors ${isWeeklyHoliday ? 'bg-gray-400 border-gray-500 text-gray-950 font-black' : 'bg-black/5 border-transparent'}`} />
+                                  }} className="w-full text-center p-2 rounded-lg bg-black/5 border-transparent outline-none focus:bg-white focus:border-rose-300 transition-all" />
                               </td>
-                              <td className={`p-2 border ${isWeeklyHoliday ? 'bg-gray-300' : ''}`}>
+                              <td className="p-2 border">
                                   <input type="text" value={row.notes || ""} placeholder="..." onChange={e => {
                                       const up = [...currentTable]; up[idx].notes = e.target.value; setCurrentTable(up);
-                                  }} className="w-full text-center p-2 bg-transparent text-[10px] font-bold outline-none text-rose-700 placeholder:opacity-30" />
+                                  }} className="w-full text-center p-2 bg-transparent text-xs font-bold outline-none text-rose-700" />
                               </td>
                             </tr>
                           );
@@ -493,129 +401,75 @@ export default function App() {
           {view === 'HISTORY' && (
             <div className="max-w-6xl mx-auto space-y-8 animate-in slide-in-from-left">
               <div className="flex justify-between items-center">
-                <h2 className="text-3xl font-black">الأرشيف والسجلات المتقدمة</h2>
-                <div className="flex gap-2">
-                  <button onClick={handleExportHistoryDate} className="bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-md">
-                    <Download size={18}/> تصدير التاريخ
-                  </button>
-                  <button onClick={handleSaveAll} className="bg-emerald-600 text-white px-6 py-2 rounded-xl font-bold flex items-center gap-2 active:scale-95 shadow-md">
-                    <CloudUpload size={18}/> حفظ التعديلات
-                  </button>
-                </div>
+                <h2 className="text-3xl font-black">الأرشيف والسجلات المرحلة</h2>
+                <button onClick={handleSaveAll} className="bg-emerald-600 text-white px-6 py-2 rounded-xl font-bold flex items-center gap-2 active:scale-95 shadow-md">
+                    <Save size={18}/> حفظ التعديلات
+                </button>
               </div>
               
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className={getCardClasses()}>
-                  <label className="block font-bold mb-4 flex items-center gap-2 text-indigo-600"><Users size={20}/> ملف الموظف الكامل في الأرشيف</label>
-                  <select value={historySelectedEmployeeId} onChange={e => setHistorySelectedEmployeeId(e.target.value)} className="w-full p-4 bg-black/5 rounded-2xl outline-none text-black mb-6">
-                    <option value="">اختر الموظف لمراجعة سجلاته...</option>
-                    {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-                  </select>
+              <div className={getCardClasses()}>
+                <label className="block font-bold mb-4 flex items-center gap-2 text-indigo-600"><Users size={20}/> البحث عن سجلات الموظف</label>
+                <select value={historySelectedEmployeeId} onChange={e => setHistorySelectedEmployeeId(e.target.value)} className="w-full p-4 bg-black/5 rounded-2xl outline-none text-black mb-8">
+                  <option value="">اختر الموظف لعرض جداوله المرحلة...</option>
+                  {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                </select>
 
-                  <div className="space-y-8">
-                    {/* Display Archived Attendance Cycles */}
-                    {Object.entries(historyAttendanceGrouped).length > 0 && (
-                      <div className="space-y-4">
-                        <h4 className="font-black text-rose-600 flex items-center gap-2 border-b pb-2"><Clock size={18}/> سجلات الحضور والانصراف المرحلة</h4>
-                        {Object.entries(historyAttendanceGrouped).map(([label, records]) => (
-                          <div key={label} className="p-4 bg-black/5 rounded-2xl border-r-4 border-rose-500 overflow-hidden">
-                            <h5 className="font-bold text-xs mb-3 text-rose-800">{label}</h5>
-                            <div className="overflow-x-auto selectable-table">
-                              <table className="w-full text-[10px] text-center border-collapse bg-white/50 rounded-xl overflow-hidden">
-                                <thead className="bg-rose-100 text-rose-800">
-                                  <tr>
-                                    <th className="p-2 border border-white">اليوم</th>
-                                    <th className="p-2 border border-white">التاريخ</th>
-                                    <th className="p-2 border border-white">ح</th>
-                                    <th className="p-2 border border-white">ص</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {/* Fix: Cast 'records' to 'AttendanceRecord[]' as Object.entries value might be inferred as 'unknown' */}
-                                  {(records as AttendanceRecord[]).map((r, i) => {
-                                    const isHoliday = r.checkIn === 'اجازه';
-                                    return (
-                                      <tr key={i} className={`border-b border-white ${isHoliday ? 'bg-gray-100 opacity-60' : ''}`}>
-                                        <td className="p-1.5 border border-white font-bold">{r.day}</td>
-                                        <td className="p-1.5 border border-white">{r.date.split('/')[0]}/{r.date.split('/')[1]}</td>
-                                        <td className={`p-1.5 border border-white ${isHoliday ? 'text-rose-600 font-black' : ''}`}>{r.checkIn}</td>
-                                        <td className={`p-1.5 border border-white ${isHoliday ? 'text-rose-600 font-black' : ''}`}>{r.checkOut}</td>
-                                      </tr>
-                                    );
-                                  })}
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Display Vacations */}
-                    {Object.entries(historyVacationsGrouped).length > 0 && (
-                      <div className="space-y-4">
-                        <h4 className="font-black text-indigo-600 flex items-center gap-2 border-b pb-2"><Plane size={18}/> سجل الإجازات المسجلة</h4>
-                        {Object.entries(historyVacationsGrouped).map(([label, vacs]) => (
-                          <div key={label} className="p-4 bg-black/5 rounded-2xl border-r-4 border-indigo-500">
-                            <h5 className="font-bold text-xs mb-3 text-indigo-800">{label}</h5>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              {(vacs as Vacation[]).map(v => (
-                                <div key={v.id} className="text-[11px] bg-white p-3 rounded-xl shadow-sm border border-black/5 flex flex-col gap-2 relative text-black">
-                                  <div className="flex justify-between items-start">
-                                    <div className="flex flex-col">
-                                      <span className="font-bold text-rose-600 text-xs">{v.date}</span>
-                                      <span className="opacity-70">{v.type}</span>
-                                    </div>
-                                    <div className="flex gap-1">
-                                      <button onClick={() => openVacationModal(v)} className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100"><Edit2 size={12}/></button>
-                                      <button onClick={() => handleDeleteVacation(v.id)} className="p-1.5 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100"><Trash2 size={12}/></button>
-                                    </div>
-                                  </div>
-                                  {v.deductFromSalary && <span className="inline-block self-start text-[8px] bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full font-bold">تخصم من الراتب</span>}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {!historySelectedEmployeeId && (
-                      <div className="py-20 text-center opacity-30 italic">اختر موظفاً لعرض سجله الشامل</div>
-                    )}
-                    
-                    {historySelectedEmployeeId && Object.entries(historyAttendanceGrouped).length === 0 && Object.entries(historyVacationsGrouped).length === 0 && (
-                      <div className="py-20 text-center opacity-30 italic">لا يوجد سجلات مرحّلة لهذا الموظف حتى الآن</div>
-                    )}
-                  </div>
-                </div>
-
-                <div className={getCardClasses()}>
-                   <label className="block font-bold mb-4 flex items-center gap-2 text-rose-600"><Calendar size={20}/> مراجعة الحضور حسب التاريخ (لكل الموظفين)</label>
-                   <input type="date" onChange={e => setHistorySelectedDate(e.target.value)} className="w-full p-4 bg-black/5 rounded-2xl outline-none text-black mb-6" />
-                   <div className="mt-6 space-y-4">
-                      {filteredAttendance.length > 0 ? (
-                        <div className="overflow-x-auto selectable-table">
-                          <table className="w-full text-xs text-center border-collapse">
-                            <thead className="bg-black/5">
-                              <tr><th className="p-2 border">الموظف</th><th className="p-2 border">ح</th><th className="p-2 border">ص</th><th className="p-2 border">ملاحظات</th></tr>
+                <div className="space-y-12">
+                  {Object.entries(historyAttendanceGrouped).length > 0 ? (
+                    Object.entries(historyAttendanceGrouped).map(([label, records]) => (
+                      <div key={label} className="space-y-4 border-r-8 border-rose-500 pr-4 animate-in fade-in slide-in-from-right">
+                        <div className="flex justify-between items-center">
+                            <h4 className="text-xl font-black text-rose-600">{label}</h4>
+                            <button onClick={() => {
+                                const emp = employees.find(e => e.id === historySelectedEmployeeId);
+                                exportAttendanceExcel(records as AttendanceRecord[], emp?.name || "غير معروف");
+                            }} className="text-xs bg-black/5 hover:bg-black/10 px-4 py-2 rounded-lg flex items-center gap-2">
+                                <Download size={14}/> تصدير الدورة
+                            </button>
+                        </div>
+                        <div className="overflow-x-auto selectable-table rounded-2xl border border-black/5">
+                          <table className="w-full text-xs text-center border-collapse bg-white/50">
+                            <thead className="bg-rose-50 text-rose-900">
+                              <tr>
+                                <th className="p-3 border">اليوم</th>
+                                <th className="p-3 border">التاريخ</th>
+                                <th className="p-3 border">الحضور</th>
+                                <th className="p-3 border">الانصراف</th>
+                                <th className="p-3 border">الملاحظات</th>
+                              </tr>
                             </thead>
                             <tbody>
-                              {filteredAttendance.map(a => (
-                                <tr key={a.id} className="border-b border-black/5">
-                                  <td className="p-2 font-bold border">{a.employeeName}</td>
-                                  <td className="p-2 border">{a.checkIn}</td>
-                                  <td className="p-2 border">{a.checkOut}</td>
-                                  <td className="p-2 text-[8px] text-rose-600 font-bold border">{a.notes || "-"}</td>
-                                </tr>
-                              ))}
+                              {(records as AttendanceRecord[]).map((r, i) => {
+                                const isHoliday = r.checkIn === 'اجازه';
+                                return (
+                                  <tr key={i} className={`border-b border-black/5 ${isHoliday ? 'bg-gray-100/50' : ''}`}>
+                                    <td className="p-3 font-bold">{r.day}</td>
+                                    <td className="p-3 opacity-60">{r.date}</td>
+                                    <td className={`p-3 font-mono ${isHoliday ? 'text-rose-600 font-black' : ''}`}>{r.checkIn}</td>
+                                    <td className={`p-3 font-mono ${isHoliday ? 'text-rose-600 font-black' : ''}`}>{r.checkOut}</td>
+                                    <td className="p-3 text-[10px] text-rose-800 font-bold">{r.notes || "-"}</td>
+                                  </tr>
+                                );
+                              })}
                             </tbody>
                           </table>
                         </div>
-                      ) : (
-                        historySelectedDate && <div className="p-10 text-center opacity-40 italic">لا توجد سجلات مرحّلة لهذا اليوم</div>
-                      )}
-                   </div>
+                      </div>
+                    ))
+                  ) : (
+                    historySelectedEmployeeId && (
+                      <div className="py-20 text-center opacity-40 italic flex flex-col items-center gap-4">
+                        <History size={48} />
+                        لا توجد سجلات مرحّلة لهذا الموظف حتى الآن.
+                      </div>
+                    )
+                  )}
+                  
+                  {!historySelectedEmployeeId && (
+                    <div className="py-20 text-center opacity-20 italic font-black text-2xl uppercase tracking-widest">
+                      اختر الموظف للمراجعة
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -626,11 +480,8 @@ export default function App() {
               <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
                 <h2 className="text-3xl font-black flex items-center gap-3"><Plane size={32} className="text-indigo-600"/> إدارة الإجازات</h2>
                 <div className="flex flex-wrap gap-3 w-full sm:w-auto">
-                  <button onClick={handleExportVacations} className="bg-indigo-50 text-indigo-600 px-6 py-4 rounded-2xl font-bold border border-indigo-200 shadow-md hover:bg-indigo-100 flex items-center justify-center gap-2">
-                    <FileDown size={20}/> تصدير الإجازات
-                  </button>
                   <button onClick={handleSaveAll} className="bg-emerald-600 text-white px-6 py-4 rounded-2xl font-bold shadow-xl active:scale-95 flex items-center justify-center gap-2 transition-all">
-                    <Save size={20}/> حفظ التعديلات والمزامنة
+                    <Save size={20}/> حفظ ومزامنة البيانات
                   </button>
                   <button onClick={() => openVacationModal()} className="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black shadow-xl active:scale-95 flex items-center justify-center gap-2 transition-all">
                     <Plus size={24}/> تسجيل إجازة جديدة
@@ -641,7 +492,7 @@ export default function App() {
               <div className={getCardClasses()}>
                 <div className="flex flex-col md:flex-row gap-4 mb-8">
                   <div className="flex-1">
-                    <label className="block text-xs font-bold mb-2 opacity-60 uppercase">عرض إجازات موظف محدد</label>
+                    <label className="block text-xs font-bold mb-2 opacity-60">تصفية حسب الموظف</label>
                     <select value={vacationFilterId} onChange={e => setVacationFilterId(e.target.value)} className="w-full p-4 bg-black/5 rounded-2xl outline-none text-black">
                       <option value="">عرض الكل...</option>
                       {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
@@ -661,12 +512,77 @@ export default function App() {
                           <div className="flex gap-2 items-center text-[10px] opacity-60">
                             <span className="font-mono bg-white px-1.5 rounded border border-black/5">{v.date}</span>
                             <span className="bg-white px-2 py-0.5 rounded shadow-sm text-indigo-600 font-bold">{v.type}</span>
-                            {v.deductFromSalary && <span className="text-rose-500 font-bold px-1.5 bg-rose-50 rounded">خصم</span>}
                           </div>
                         </div>
                       </div>
                       <div className="flex gap-1">
-                        <button onClick={() => openVacationModal(v)} title="تعديل" className="p-2.5 bg-indigo-50 text-indigo-500 rounded-xl hover:bg-indigo-100 active:scale-90 transition-all">
-                          <Edit2 size={16}/>
-                        </button>
-                        <button onClick={() => handleDeleteVacation(v.id)} title="حذف"
+                        <button onClick={() => openVacationModal(v)} className="p-2.5 bg-indigo-50 text-indigo-500 rounded-xl hover:bg-indigo-100 transition-all"><Edit2 size={16}/></button>
+                        <button onClick={() => handleDeleteVacation(v.id)} className="p-2.5 bg-rose-50 text-rose-500 rounded-xl hover:bg-rose-100 transition-all"><Trash2 size={16}/></button>
+                      </div>
+                    </div>
+                  ))}
+                  {vacations.length === 0 && (
+                    <div className="col-span-full py-20 text-center opacity-30 italic">لا توجد إجازات مسجلة حالياً</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </main>
+      </div>
+
+      {/* Vacation Modal */}
+      {isVacationModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={() => setIsVacationModalOpen(false)}></div>
+          <div className={`${getCardClasses()} w-full max-w-xl relative animate-in zoom-in duration-300 border-indigo-500/30 border-2 bg-white text-gray-900 shadow-2xl overflow-hidden`}>
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-2xl font-black text-indigo-600">{editingVacationId ? 'تعديل الإجازة' : 'تسجيل إجازة'}</h3>
+              <button onClick={() => setIsVacationModalOpen(false)} className="p-2 hover:bg-black/5 rounded-full"><X size={24}/></button>
+            </div>
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold opacity-60">{editingVacationId ? 'التاريخ' : 'من تاريخ'}</label>
+                  <input type="date" value={editingVacationId ? startDateInput.split('/').reverse().join('-') : undefined} onChange={e => setStartDateInput(formatDate(new Date(e.target.value)))} className="w-full p-4 bg-gray-100 rounded-2xl outline-none font-bold text-center focus:ring-2 ring-indigo-500 transition-all" />
+                </div>
+                {!editingVacationId && (
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold opacity-60">حتى تاريخ</label>
+                    <input type="date" onChange={e => setEndDateInput(formatDate(new Date(e.target.value)))} className="w-full p-4 bg-gray-100 rounded-2xl outline-none font-bold text-center focus:ring-2 ring-indigo-500 transition-all" />
+                  </div>
+                )}
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold opacity-60">نوع الإجازة</label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {(['سنوي', 'مرضي', 'عيد', 'غياب بإذن'] as VacationType[]).map(t => (
+                    <button key={t} onClick={() => setVacationType(t)} className={`py-3 rounded-xl text-sm font-bold transition-all ${vacationType === t ? 'bg-indigo-600 text-white shadow-lg' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>{t}</button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex items-center justify-between p-4 bg-rose-50 rounded-2xl border border-rose-100">
+                <div className="flex items-center gap-3 text-rose-800"><WalletCards size={20}/><span className="font-bold">إجازة تخصم من الراتب</span></div>
+                <button onClick={() => setDeductFromSalary(!deductFromSalary)} className={`w-14 h-8 rounded-full transition-all relative ${deductFromSalary ? 'bg-rose-500' : 'bg-gray-300'}`}><div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all ${deductFromSalary ? 'right-7' : 'right-1'}`}></div></button>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold opacity-60">اختر الموظف</label>
+                <select value={selectedEmployeeId} onChange={e => setSelectedEmployeeId(e.target.value)} className="w-full p-4 bg-gray-100 rounded-2xl outline-none font-bold text-black focus:ring-2 ring-indigo-500 transition-all">
+                  <option value="">-- اختر الموظف --</option>
+                  {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                </select>
+              </div>
+              <button onClick={handleAddVacation} disabled={!selectedEmployeeId} className={`w-full py-4 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all ${selectedEmployeeId ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}>
+                تأكيد ومزامنة البيانات
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <footer className="bg-black/5 border-t p-3 text-center text-[10px] opacity-40 shrink-0">
+        SOFT ROSE MANAGEMENT SYSTEM &bull; v4.0 &copy; 2025
+      </footer>
+    </div>
+  );
+}
