@@ -10,10 +10,7 @@ export const generateRandomTime = (startHour: number, startMin: number, endHour:
   const h = Math.floor(randomTotalMinutes / 60);
   const m = randomTotalMinutes % 60;
   
-  const hourStr = h > 12 ? (h - 12).toString() : h.toString();
-  const ampm = h >= 12 ? 'م' : 'ص';
-  
-  return `${hourStr}:${m.toString().padStart(2, '0')} ${ampm}`;
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
 };
 
 export const parseDate = (dateStr: string): Date => {
@@ -60,23 +57,21 @@ export const generateAttendanceCycle = (
   const employeeVacations = vacations.filter(v => v.employeeId === employeeId);
 
   while (currentDate <= endDate) {
-    const dayIndex = currentDate.getDay(); // 0 (Sun) to 6 (Sat)
+    const dayIndex = currentDate.getDay(); 
     const dayName = DAYS_ARABIC[dayIndex];
     const dateStr = formatDate(currentDate);
 
-    // 1. Check for manual vacations
     const manualVacation = employeeVacations.find(v => v.date === dateStr);
     
-    // 2. Check for fixed weekly holidays
     let isWeeklyHoliday = false;
     if (employeeName === 'اسماء صالح') {
-      if (dayIndex === 2) isWeeklyHoliday = true; // الثلاثاء
+      if (dayIndex === 2) isWeeklyHoliday = true; 
     } else if (employeeName === 'ملك هيثم') {
-      if (dayIndex === 1) isWeeklyHoliday = true; // الاثنين
+      if (dayIndex === 1) isWeeklyHoliday = true; 
     } else if (employeeName === 'امنيه اشرف') {
-      if (dayIndex === 0) isWeeklyHoliday = true; // الأحد
+      if (dayIndex === 0) isWeeklyHoliday = true; 
     } else {
-      if (dayIndex === 5) isWeeklyHoliday = true; // الجمعة (الباقي)
+      if (dayIndex === 5) isWeeklyHoliday = true; 
     }
 
     let checkIn = "";
@@ -88,8 +83,8 @@ export const generateAttendanceCycle = (
       checkOut = manualVacation.type;
       note = manualVacation.deductFromSalary ? "تخصم من الراتب" : "";
     } else if (isWeeklyHoliday) {
-      checkIn = "راحة إسبوعية";
-      checkOut = "-";
+      checkIn = "اجازه";
+      checkOut = "اسبوعيه";
       note = "";
     } else {
       checkIn = generateRandomTime(9, 0, 9, 45);

@@ -89,7 +89,6 @@ export default function App() {
     setSaveStatus(true);
     setTimeout(() => setSaveStatus(false), 2000);
     
-    // Refresh current table if it exists to show new vacations
     if (selectedEmployeeId && currentTable.length > 0) {
       const emp = employees.find(e => e.id === selectedEmployeeId);
       if (emp) {
@@ -173,27 +172,42 @@ export default function App() {
     alert('تم الترحيل للأرشيف بنجاح');
   };
 
-  // Specialized Excel Export Helper
-  const exportAttendanceExcel = (data: AttendanceRecord[], employeeName: string, title: string) => {
-    const header = [[`اسم الموظف: ${employeeName}`], [`${title}`], []];
+  // Improved Excel Export with required formatting
+  const exportAttendanceExcel = (data: AttendanceRecord[], employeeName: string) => {
+    // 1. Prepare Header (Only Employee Name)
+    const header = [[`اسم الموظف: ${employeeName}`], []];
+    
+    // 2. Table Headers
     const columns = [["اليوم", "التاريخ", "الحضور", "الانصراف", "الملاحظات"]];
+    
+    // 3. Table Rows
     const rows = data.map(r => [r.day, r.date, r.checkIn, r.checkOut, r.notes || ""]);
     
     const combined = [...header, ...columns, ...rows];
     const ws = XLSX.utils.aoa_to_sheet(combined);
     
-    const wscols = [{wch: 15}, {wch: 15}, {wch: 15}, {wch: 15}, {wch: 25}];
+    // 4. Set Column Widths (Auto-fit logic)
+    const wscols = [
+      { wch: 15 }, // Day
+      { wch: 15 }, // Date
+      { wch: 15 }, // Check-in
+      { wch: 15 }, // Check-out
+      { wch: 30 }  // Notes
+    ];
     ws['!cols'] = wscols;
 
+    // Note: Style properties (Borders, Fonts, Alignment) require XLSX styles extensions or Pro.
+    // We provide a clean structure that Excel will interpret as a standard table.
+    
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Attendance");
-    XLSX.writeFile(wb, `SoftRose_${employeeName}_${new Date().toLocaleDateString()}.xlsx`);
+    XLSX.writeFile(wb, `SoftRose_${employeeName}.xlsx`);
   };
 
   const handleExportEntryTable = () => {
     if (currentTable.length === 0) return alert("لا توجد بيانات لتصديرها");
     const empName = employees.find(e => e.id === selectedEmployeeId)?.name || "غير معروف";
-    exportAttendanceExcel(currentTable, empName, `سجل حضور وانصراف - شهر ${selectedMonth}`);
+    exportAttendanceExcel(currentTable, empName);
   };
 
   const handleExportHistoryDate = () => {
@@ -353,7 +367,7 @@ export default function App() {
                </div>
                <div className={getCardClasses()}>
                   <h2 className="text-3xl font-black mb-4">أهلاً بك في نظام SOFT ROSE</h2>
-                  <p className="opacity-80 mb-8 leading-relaxed">نظام متكامل لإدارة الحضور والانصراف مع دعم العطلات الأسبوعية المخصصة (الجمعة افتراضي، الثلاثاء لأسماء، الاثنين لملك، الأحد لأمنية).</p>
+                  <p className="opacity-80 mb-8 leading-relaxed">نظام متكامل لإدارة الحضور والانصراف مع دعم العطلات الأسبوعية المخصصة.</p>
                   <button onClick={handleSaveAll} className="flex items-center gap-2 bg-emerald-600 text-white px-8 py-3 rounded-2xl font-bold shadow-lg active:scale-95 transition-all">
                     <Save size={20}/> حفظ ومزامنة البيانات
                   </button>
@@ -411,35 +425,38 @@ export default function App() {
                     <table className="w-full text-center border-collapse">
                       <thead className="bg-black/5 text-xs">
                         <tr>
-                          <th className="p-4">اليوم</th>
-                          <th className="p-4">التاريخ</th>
-                          <th className="p-4">الحضور</th>
-                          <th className="p-4">الانصراف</th>
-                          <th className="p-4">الملاحظات</th>
+                          <th className="p-4 border">اليوم</th>
+                          <th className="p-4 border">التاريخ</th>
+                          <th className="p-4 border">الحضور</th>
+                          <th className="p-4 border">الانصراف</th>
+                          <th className="p-4 border">الملاحظات</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {currentTable.map((row, idx) => (
-                          <tr key={idx} className={`border-b border-black/5 text-sm ${row.checkIn === 'راحة إسبوعية' ? 'bg-gray-50/50' : ''}`}>
-                            <td className="p-4 font-bold">{row.day}</td>
-                            <td className="p-4 opacity-70" dir="ltr">{row.date}</td>
-                            <td className="p-2">
-                                <input type="text" value={row.checkIn} onChange={e => {
-                                    const up = [...currentTable]; up[idx].checkIn = e.target.value; setCurrentTable(up);
-                                }} className={`w-full text-center p-2 rounded-lg outline-none focus:bg-white border transition-colors ${row.checkIn === 'راحة إسبوعية' ? 'bg-indigo-50 border-indigo-100 text-indigo-700 font-bold' : 'bg-black/5 border-transparent'}`} />
-                            </td>
-                            <td className="p-2">
-                                <input type="text" value={row.checkOut} onChange={e => {
-                                    const up = [...currentTable]; up[idx].checkOut = e.target.value; setCurrentTable(up);
-                                }} className="w-full text-center p-2 bg-black/5 rounded-lg border-transparent border outline-none focus:bg-white" />
-                            </td>
-                            <td className="p-2">
-                              <span className={`text-[10px] font-bold ${row.notes ? 'text-rose-600' : 'opacity-40'}`}>
-                                {row.notes || "-"}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
+                        {currentTable.map((row, idx) => {
+                          const isWeeklyHoliday = row.checkIn === 'اجازه' && row.checkOut === 'اسبوعيه';
+                          return (
+                            <tr key={idx} className={`border-b border-black/5 text-sm transition-colors ${isWeeklyHoliday ? 'bg-gray-200 text-gray-900' : ''}`}>
+                              <td className={`p-4 font-bold border ${isWeeklyHoliday ? 'bg-gray-300' : ''}`}>{row.day}</td>
+                              <td className={`p-4 opacity-70 border ${isWeeklyHoliday ? 'bg-gray-300' : ''}`} dir="ltr">{row.date}</td>
+                              <td className={`p-2 border ${isWeeklyHoliday ? 'bg-gray-300' : ''}`}>
+                                  <input type="text" value={row.checkIn} onChange={e => {
+                                      const up = [...currentTable]; up[idx].checkIn = e.target.value; setCurrentTable(up);
+                                  }} className={`w-full text-center p-2 rounded-lg outline-none focus:bg-white border transition-colors ${isWeeklyHoliday ? 'bg-gray-400 border-gray-500 text-gray-950 font-black' : 'bg-black/5 border-transparent'}`} />
+                              </td>
+                              <td className={`p-2 border ${isWeeklyHoliday ? 'bg-gray-300' : ''}`}>
+                                  <input type="text" value={row.checkOut} onChange={e => {
+                                      const up = [...currentTable]; up[idx].checkOut = e.target.value; setCurrentTable(up);
+                                  }} className={`w-full text-center p-2 rounded-lg border outline-none focus:bg-white transition-colors ${isWeeklyHoliday ? 'bg-gray-400 border-gray-500 text-gray-950 font-black' : 'bg-black/5 border-transparent'}`} />
+                              </td>
+                              <td className={`p-2 border ${isWeeklyHoliday ? 'bg-gray-300' : ''}`}>
+                                  <input type="text" value={row.notes || ""} placeholder="..." onChange={e => {
+                                      const up = [...currentTable]; up[idx].notes = e.target.value; setCurrentTable(up);
+                                  }} className="w-full text-center p-2 bg-transparent text-[10px] font-bold outline-none text-rose-700 placeholder:opacity-30" />
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -457,7 +474,7 @@ export default function App() {
                     <Download size={18}/> تصدير التاريخ
                   </button>
                   <button onClick={handleSaveAll} className="bg-emerald-600 text-white px-6 py-2 rounded-xl font-bold flex items-center gap-2 active:scale-95 shadow-md">
-                    <CloudUpload size={18}/> حفظ التغييرات
+                    <CloudUpload size={18}/> حفظ التعديلات
                   </button>
                 </div>
               </div>
@@ -501,17 +518,17 @@ export default function App() {
                    <div className="mt-6 space-y-4">
                       {filteredAttendance.length > 0 ? (
                         <div className="overflow-x-auto">
-                          <table className="w-full text-xs text-center">
+                          <table className="w-full text-xs text-center border-collapse">
                             <thead className="bg-black/5">
-                              <tr><th className="p-2">الموظف</th><th className="p-2">ح</th><th className="p-2">ص</th><th className="p-2">ملاحظات</th></tr>
+                              <tr><th className="p-2 border">الموظف</th><th className="p-2 border">ح</th><th className="p-2 border">ص</th><th className="p-2 border">ملاحظات</th></tr>
                             </thead>
                             <tbody>
                               {filteredAttendance.map(a => (
                                 <tr key={a.id} className="border-b border-black/5">
-                                  <td className="p-2 font-bold">{a.employeeName}</td>
-                                  <td className="p-2">{a.checkIn}</td>
-                                  <td className="p-2">{a.checkOut}</td>
-                                  <td className="p-2 text-[8px] text-rose-600 font-bold">{a.notes || "-"}</td>
+                                  <td className="p-2 font-bold border">{a.employeeName}</td>
+                                  <td className="p-2 border">{a.checkIn}</td>
+                                  <td className="p-2 border">{a.checkOut}</td>
+                                  <td className="p-2 text-[8px] text-rose-600 font-bold border">{a.notes || "-"}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -556,7 +573,7 @@ export default function App() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {vacations.filter(v => vacationFilterId ? v.employeeId === vacationFilterId : true).map(v => (
-                    <div key={v.id} className="p-4 bg-black/5 rounded-2xl flex justify-between items-center border border-black/5 group hover:border-indigo-200 transition-colors">
+                    <div key={v.id} className="p-4 bg-black/5 rounded-2xl flex justify-between items-center border border-black/5 group hover:border-indigo-200 transition-colors text-black">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-black">
                           {employees.find(e => e.id === v.employeeId)?.name.charAt(0)}
@@ -640,7 +657,7 @@ export default function App() {
       )}
 
       <footer className="bg-black/5 border-t p-3 text-center text-[10px] opacity-40 shrink-0">
-        SOFT ROSE MANAGEMENT SYSTEM &bull; v2.6 &copy; 2025
+        SOFT ROSE MANAGEMENT SYSTEM &bull; v2.8 &copy; 2025
       </footer>
     </div>
   );
