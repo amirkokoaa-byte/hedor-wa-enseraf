@@ -1,5 +1,5 @@
 {
-  "name": "Soft Rose Attendance System",
+  "name": "حضور وانصراف HR",
   "description": "A comprehensive attendance management system for employees with dynamic table generation, custom cycles (21st to 20th), random time suggestions, and Excel export functionality.",
   "requestFramePermissions": []
 }

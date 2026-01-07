@@ -9,7 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Almarai:wght@300;400;700;800&family=Cairo:wght@200;400;600;700;900&display=swap" rel="stylesheet">
     <style>
       :root {
-        --rose-main: #e11d48;
+        --blue-main: #2563eb;
       }
       body {
         font-family: 'Cairo', 'Almarai', sans-serif;
@@ -20,48 +20,40 @@
       /* Custom Scrollbar */
       ::-webkit-scrollbar { width: 4px; height: 4px; }
       ::-webkit-scrollbar-track { background: transparent; }
-      ::-webkit-scrollbar-thumb { background: var(--rose-main); border-radius: 10px; }
+      ::-webkit-scrollbar-thumb { background: var(--blue-main); border-radius: 10px; }
       
+      /* Glass Sidebar */
+      .glass-sidebar {
+        background: rgba(255, 255, 255, 0.05) !important;
+        backdrop-filter: blur(20px) !important;
+        -webkit-backdrop-filter: blur(20px) !important;
+        border-left: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
       /* Glass Theme Styles */
       .theme-glass {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
         background-attachment: fixed;
       }
       .glass-card {
-        background: rgba(255, 255, 255, 0.15);
+        background: rgba(255, 255, 255, 0.1);
         backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);
         border: 1px solid rgba(255, 255, 255, 0.2);
       }
 
       /* Obsidian Dark Styles */
-      .theme-dark {
-        background: #000000;
-        color: #ffffff;
-      }
-      .dark-card {
-        background: #121212;
-        border: 1px solid #222;
-      }
-
-      /* Royal Emerald Styles */
-      .theme-emerald {
-        background: #064e3b;
-      }
-      .emerald-card {
-        background: #065f46;
-        border: 1px solid #059669;
-        color: white;
-      }
+      .theme-dark { background: #020617; color: #ffffff; }
+      .dark-card { background: #0f172a; border: 1px solid #1e293b; }
 
       /* Mobile Table Enhancements */
-      @media (max-width: 640px) {
-        table { font-size: 0.8rem; }
-        .mobile-hide { display: none; }
-        input[type="text"], select { font-size: 0.9rem !important; }
+      @media (max-width: 768px) {
+        table { font-size: 0.75rem; }
+        .p-4 { padding: 0.75rem !important; }
+        .text-3xl { font-size: 1.5rem !important; }
+        input[type="text"], select { font-size: 0.85rem !important; height: 40px !important; }
       }
 
-      /* Allow text selection in tables even if global select is limited */
       .selectable-table {
         user-select: text !important;
         -webkit-user-select: text !important;

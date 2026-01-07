@@ -10,9 +10,8 @@ export const generateRandomTime = (startHour: number, startMin: number, endHour:
   let h = Math.floor(randomTotalMinutes / 60);
   const m = randomTotalMinutes % 60;
   
-  // تحويل لنظام 12 ساعة عددي فقط بدون ص/م
   h = h % 12;
-  h = h ? h : 12; // الساعة 0 تصبح 12
+  h = h ? h : 12;
   
   return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
 };
@@ -55,28 +54,29 @@ export const generateAttendanceCycle = (
 ): AttendanceRecord[] => {
   const records: AttendanceRecord[] = [];
   
-  let currentDate = new Date(year, startMonth - 1, 21);
-  const endDate = new Date(year, startMonth, 20);
+  // الدورة تبدأ من 21 الشهر السابق (startMonth-1) وتنتهي 20 الشهر الحالي (startMonth)
+  // لكن برمجياً Month هو 0-indexed
+  let currentDate = new Date(year, startMonth - 2, 21);
+  const endDate = new Date(year, startMonth - 1, 20);
 
   const employeeVacations = vacations.filter(v => v.employeeId === employeeId);
+  
+  // عداد الإجازات السنوية في هذه الدورة
+  let annualLeaveCount = 0;
 
   while (currentDate <= endDate) {
+    const dateStr = formatDate(currentDate);
     const dayIndex = currentDate.getDay(); 
     const dayName = DAYS_ARABIC[dayIndex];
-    const dateStr = formatDate(currentDate);
 
     const manualVacation = employeeVacations.find(v => v.date === dateStr);
     
     let isWeeklyHoliday = false;
-    if (employeeName === 'اسماء صالح') {
-      if (dayIndex === 2) isWeeklyHoliday = true; 
-    } else if (employeeName === 'ملك هيثم') {
-      if (dayIndex === 1) isWeeklyHoliday = true; 
-    } else if (employeeName === 'امنيه اشرف') {
-      if (dayIndex === 0) isWeeklyHoliday = true; 
-    } else {
-      if (dayIndex === 5) isWeeklyHoliday = true; 
-    }
+    // تحديد الإجازات الأسبوعية بناءً على الاسم (نفس المنطق السابق)
+    if (employeeName === 'اسماء صالح' && dayIndex === 2) isWeeklyHoliday = true; 
+    else if (employeeName === 'ملك هيثم' && dayIndex === 1) isWeeklyHoliday = true; 
+    else if (employeeName === 'امنيه اشرف' && dayIndex === 0) isWeeklyHoliday = true; 
+    else if (dayIndex === 5 && !['اسماء صالح', 'ملك هيثم', 'امنيه اشرف'].includes(employeeName)) isWeeklyHoliday = true;
 
     let checkIn = "";
     let checkOut = "";
@@ -85,15 +85,23 @@ export const generateAttendanceCycle = (
     if (manualVacation) {
       checkIn = "اجازه";
       checkOut = manualVacation.type;
-      note = manualVacation.deductFromSalary ? "تخصم من الراتب" : "";
+      
+      if (manualVacation.type === 'سنوي') {
+        annualLeaveCount++;
+        if (annualLeaveCount > 2) {
+          note = "خصم من الراتب";
+        }
+      }
+      
+      if (manualVacation.deductFromSalary && !note) {
+        note = "خصم من الراتب";
+      }
     } else if (isWeeklyHoliday) {
       checkIn = "اجازه";
       checkOut = "اسبوعيه";
-      note = "";
     } else {
       checkIn = generateRandomTime(9, 0, 9, 45);
       checkOut = generateRandomTime(16, 45, 18, 14);
-      note = "";
     }
 
     records.push({
