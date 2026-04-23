@@ -18,7 +18,7 @@ export interface AttendanceRecord {
   cycleYear?: number;
 }
 
-export type VacationType = 'سنوي' | 'مرضي' | 'عيد' | 'غياب بإذن';
+export type VacationType = 'سنوي' | 'مرضي' | 'عيد' | 'غياب بإذن' | 'إجازة عارض';
 
 export interface Vacation {
   id: string;

@@ -370,7 +370,15 @@ export default function App() {
                   <div className="p-4 border-b border-black/5 flex flex-col sm:flex-row justify-between items-center gap-4 bg-gray-50/50">
                     <h3 className="font-black text-lg text-blue-800">مراجعة بيانات الجدول</h3>
                     <div className="flex gap-2 w-full sm:w-auto">
-                      <button onClick={handleCopyTableData} className="flex-1 bg-blue-100 text-blue-700 px-4 py-2 rounded-xl font-bold shadow-sm hover:bg-blue-200 transition-all"><Copy size={16}/></button>
+                      <button onClick={() => {
+                        const empName = employees.find(e => e.id === selectedEmployeeId)?.name || 'غير معروف';
+                        handleExportEntrySingle(currentTable, empName);
+                      }} className="flex-1 bg-emerald-100 text-emerald-700 px-4 py-2 rounded-xl font-bold shadow-sm hover:bg-emerald-200 transition-all flex items-center justify-center" title="تصدير إكسيل">
+                        <FileDown size={16}/>
+                      </button>
+                      <button onClick={handleCopyTableData} className="flex-1 bg-blue-100 text-blue-700 px-4 py-2 rounded-xl font-bold shadow-sm hover:bg-blue-200 transition-all flex items-center justify-center" title="نسخ البيانات">
+                        <Copy size={16}/>
+                      </button>
                       <button onClick={handleTransfer} className="flex-[3] bg-blue-600 text-white px-8 py-2 rounded-xl font-bold shadow-md active:scale-95">ترحيل للأرشيف</button>
                     </div>
                   </div>
@@ -592,7 +600,7 @@ export default function App() {
               <div className="space-y-2">
                 <label className="text-xs font-bold opacity-60">نوع الإجازة</label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {(['سنوي', 'مرضي', 'عيد', 'غياب بإذن'] as VacationType[]).map(t => (
+                  {(['سنوي', 'مرضي', 'عيد', 'غياب بإذن', 'إجازة عارض'] as VacationType[]).map(t => (
                     <button key={t} onClick={() => setVacationType(t)} className={`py-3 rounded-xl text-sm font-bold transition-all ${vacationType === t ? 'bg-blue-600 text-white shadow-lg' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>{t}</button>
                   ))}
                 </div>
