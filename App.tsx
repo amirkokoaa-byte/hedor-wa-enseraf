@@ -84,7 +84,7 @@ export default function App() {
     if (selectedEmployeeId && currentTable.length > 0) {
       const emp = employees.find(e => e.id === selectedEmployeeId);
       if (emp) {
-        const table = generateAttendanceCycle(selectedMonth, selectedYear, emp.id, emp.name, vacations);
+        const table = generateAttendanceCycle(selectedMonth, selectedYear, emp.id, emp.name, vacations, emp.role);
         setCurrentTable(table);
       }
     }
@@ -151,7 +151,7 @@ export default function App() {
     const dataRows = dates.map((dateStr, idx) => {
       const row = [days[idx], dateStr];
       employees.forEach(emp => {
-        const tempTable = generateAttendanceCycle(month, year, emp.id, emp.name, vacations);
+        const tempTable = generateAttendanceCycle(month, year, emp.id, emp.name, vacations, emp.role);
         const dayRecord = tempTable.find(r => r.date === dateStr);
         row.push(dayRecord?.checkIn || "-", dayRecord?.checkOut || "-");
       });
@@ -357,7 +357,7 @@ export default function App() {
                       <button onClick={() => {
                         const emp = employees.find(e => e.id === selectedEmployeeId);
                         if (!emp) return alert('يرجى اختيار موظف أولاً');
-                        const table = generateAttendanceCycle(selectedMonth, selectedYear, emp.id, emp.name, vacations);
+                        const table = generateAttendanceCycle(selectedMonth, selectedYear, emp.id, emp.name, vacations, emp.role);
                         setCurrentTable(table);
                       }} className="bg-blue-600 text-white px-8 rounded-2xl font-bold shadow-md active:scale-95 hover:bg-blue-700 transition-colors">انشيء الجدول</button>
                     </div>

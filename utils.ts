@@ -50,7 +50,8 @@ export const generateAttendanceCycle = (
   year: number, 
   employeeId: string, 
   employeeName: string,
-  vacations: Vacation[]
+  vacations: Vacation[],
+  employeeRole?: string
 ): AttendanceRecord[] => {
   const records: AttendanceRecord[] = [];
   
@@ -101,7 +102,11 @@ export const generateAttendanceCycle = (
       checkOut = "اسبوعيه";
     } else {
       checkIn = generateRandomTime(9, 0, 9, 45);
-      checkOut = generateRandomTime(16, 45, 18, 14);
+      if (employeeRole === 'اشر') {
+        checkOut = generateRandomTime(17, 45, 18, 0); // 5:45 PM to 6:00 PM
+      } else {
+        checkOut = generateRandomTime(16, 45, 17, 0); // 4:45 PM to 5:00 PM
+      }
     }
 
     records.push({
