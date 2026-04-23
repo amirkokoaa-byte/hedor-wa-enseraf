@@ -73,11 +73,14 @@ export const generateAttendanceCycle = (
     const manualVacation = employeeVacations.find(v => v.date === dateStr);
     
     let isWeeklyHoliday = false;
-    // تحديد الإجازات الأسبوعية بناءً على الاسم (نفس المنطق السابق)
-    if (employeeName === 'اسماء صالح' && dayIndex === 2) isWeeklyHoliday = true; 
-    else if (employeeName === 'ملك هيثم' && dayIndex === 1) isWeeklyHoliday = true; 
-    else if (employeeName === 'امنيه اشرف' && dayIndex === 0) isWeeklyHoliday = true; 
-    else if (dayIndex === 5 && !['اسماء صالح', 'ملك هيثم', 'امنيه اشرف'].includes(employeeName)) isWeeklyHoliday = true;
+    // تحديد الإجازات الأسبوعية بناءً على الاسم
+    const holidayOverrideNames = ['اسماء صالح', 'ملك هيثم', 'امنيه اشرف', 'تقي محمد', 'منه احمد'];
+    if (employeeName === 'اسماء صالح' && dayIndex === 2) isWeeklyHoliday = true; // الثلاثاء
+    else if (employeeName === 'ملك هيثم' && dayIndex === 1) isWeeklyHoliday = true; // الاثنين
+    else if (employeeName === 'امنيه اشرف' && dayIndex === 0) isWeeklyHoliday = true; // الأحد
+    else if (employeeName === 'تقي محمد' && dayIndex === 1) isWeeklyHoliday = true; // الاثنين
+    else if (employeeName === 'منه احمد' && dayIndex === 0) isWeeklyHoliday = true; // الأحد
+    else if (dayIndex === 5 && !holidayOverrideNames.includes(employeeName)) isWeeklyHoliday = true; // الجمعة لغير هؤلاء
 
     let checkIn = "";
     let checkOut = "";
