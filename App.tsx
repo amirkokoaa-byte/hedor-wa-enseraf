@@ -127,6 +127,63 @@ export default function App() {
     alert('تم ترحيل بيانات الموظف للأرشيف بنجاح');
   };
 
+  const exportHRExcel = () => {
+    if (employees.length === 0) return alert('لا يوجد موظفين');
+
+    const wb = XLSX.utils.book_new();
+
+    employees.forEach(emp => {
+      // 1. Generate the attendance table for this employee
+      const records = generateAttendanceCycle(selectedMonth, selectedYear, emp.id, emp.name, vacations, emp.role);
+      
+      // 2. Prepare the data (Header row first)
+      const dataRows = records.map(r => [
+        r.day,
+        r.date,
+        r.checkIn,
+        r.checkOut,
+        r.notes || ''
+      ]);
+      const wsData = [['اليوم', 'التاريخ', 'الحضور', 'الانصراف', 'الملاحظات'], ...dataRows];
+      
+      // 3. Create the worksheet
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+      // 4. Set RTL view
+      ws['!views'] = [{ rightToLeft: true }];
+
+      // 5. Apply styling to ALL cells
+      const range = XLSX.utils.decode_range(ws['!ref'] || "A1:E1");
+      for (let R = 0; R <= range.e.r; ++R) {
+        for (let C = 0; C <= range.e.c; ++C) {
+          const cellAddress = XLSX.utils.encode_cell({ c: C, r: R });
+          if (!ws[cellAddress]) continue;
+
+          ws[cellAddress].s = {
+            font: { name: "Arial", bold: true },
+            alignment: { horizontal: "center", vertical: "center" },
+            border: {
+              top: { style: "thin", color: { auto: 1 } },
+              bottom: { style: "thin", color: { auto: 1 } },
+              left: { style: "thin", color: { auto: 1 } },
+              right: { style: "thin", color: { auto: 1 } }
+            }
+          };
+        }
+      }
+
+      // 6. Set column widths
+      ws['!cols'] = [{ wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }];
+
+      // 7. Append sheet to workbook (sheet name max 31 chars, clean up if needed but names are usually short)
+      const sheetName = String(emp.name).substring(0, 31);
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    });
+
+    // 8. Write file
+    XLSX.writeFile(wb, `HR_Attendance_Report_${selectedMonth}_${selectedYear}.xlsx`);
+  };
+
   const exportAllEmployeesExcel = () => {
     const month = selectedMonth;
     const year = selectedYear;
@@ -379,9 +436,14 @@ export default function App() {
                         {Array.from({length: 12}, (_, i) => i + 1).map(m => <option key={m} value={m}>دورة شهر {m}</option>)}
                       </select>
                     </div>
-                    <button onClick={exportAllEmployeesExcel} className="bg-blue-600 text-white p-4 rounded-2xl font-black shadow-xl hover:bg-blue-700 active:scale-95 transition-all flex items-center justify-center gap-3">
-                      <Download size={24}/> تصدير جدول كل الموظفين (Excel)
-                    </button>
+                    <div className="flex flex-col gap-3">
+                      <button onClick={exportHRExcel} className="bg-emerald-600 text-white p-4 rounded-2xl font-black shadow-xl hover:bg-emerald-700 active:scale-95 transition-all flex items-center justify-center gap-3">
+                        <Download size={24}/> حضور وانصراف HR
+                      </button>
+                      <button onClick={exportAllEmployeesExcel} className="bg-blue-600 text-white p-4 rounded-2xl font-black shadow-xl hover:bg-blue-700 active:scale-95 transition-all flex items-center justify-center gap-3">
+                        <Download size={24}/> تصدير جدول كل الموظفين (Excel)
+                      </button>
+                    </div>
                   </div>
                </div>
 
