@@ -174,6 +174,39 @@ export default function App() {
     });
     ws['!cols'] = wscols;
 
+    const range = XLSX.utils.decode_range(ws['!ref'] || "A1:Z100");
+    for (let R = 0; R <= range.e.r; ++R) {
+      const isHeader = R === 0 || R === 1;
+      const dayCell = ws[XLSX.utils.encode_cell({c: 0, r: R})];
+      const isFriday = dayCell?.v === 'الجمعة';
+
+      for (let C = 0; C <= range.e.c; ++C) {
+        const cellAddress = XLSX.utils.encode_cell({c: C, r: R});
+        if (!ws[cellAddress]) continue;
+
+        ws[cellAddress].s = {
+          font: { bold: isHeader },
+          alignment: { horizontal: "center", vertical: "center" }
+        };
+
+        if (!isHeader && isFriday) {
+          if (C === 0 || C === 1) {
+            // First two columns (Day and Date) check if ANY coordinator exists to shade? 
+            // Better to just shade the specific employee's column
+          } else {
+            const employeeIndex = Math.floor((C - 2) / 2);
+            if (employeeIndex >= 0 && employeeIndex < employees.length) {
+              const emp = employees[employeeIndex];
+              if (emp.role === 'منسق') {
+                ws[cellAddress].s.fill = { fgColor: { rgb: "E5E7EB" } }; // Light gray
+                ws[cellAddress].s.font.bold = true;
+              }
+            }
+          }
+        }
+      }
+    }
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "تقرير شامل");
     XLSX.writeFile(wb, `SoftRose_Master_Report_${month}_${year}.xlsx`);
@@ -188,6 +221,33 @@ export default function App() {
       'الانصراف': r.checkOut,
       'الملاحظات': r.notes || ''
     })));
+
+    const emp = employees.find(e => e.name === employeeName);
+    const isCoordinator = emp?.role === 'منسق';
+
+    const range = XLSX.utils.decode_range(ws['!ref'] || "A1:E1");
+    for (let R = 0; R <= range.e.r; ++R) {
+      const isHeader = R === 0;
+      const dayCell = ws[XLSX.utils.encode_cell({c: 0, r: R})];
+      const isFriday = dayCell?.v === 'الجمعة';
+      
+      for (let C = 0; C <= range.e.c; ++C) {
+        const cellAddress = XLSX.utils.encode_cell({c: C, r: R});
+        if (!ws[cellAddress]) continue;
+        
+        ws[cellAddress].s = {
+          font: { bold: isHeader || (isCoordinator && isFriday) },
+          alignment: { horizontal: "center", vertical: "center" }
+        };
+        
+        if (isCoordinator && isFriday) {
+          ws[cellAddress].s.fill = { fgColor: { rgb: "E5E7EB" } }; // Light gray
+        }
+      }
+    }
+
+    ws['!cols'] = [{wch: 10}, {wch: 12}, {wch: 10}, {wch: 10}, {wch: 15}];
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Attendance");
     XLSX.writeFile(wb, `SoftRose_${employeeName}_Attendance.xlsx`);
@@ -395,9 +455,19 @@ export default function App() {
                       </thead>
                       <tbody>
                         {currentTable.map((row, idx) => {
+                          const currentEmployee = employees.find(e => e.id === selectedEmployeeId);
+                          const isCoordinatorFriday = currentEmployee?.role === 'منسق' && row.day === 'الجمعة';
                           const isHoliday = row.checkIn === 'اجازه';
+                          
+                          let rowClasses = "border-b border-black/5 text-sm";
+                          if (isCoordinatorFriday) {
+                            rowClasses += " bg-gray-200 text-gray-800 font-bold";
+                          } else if (isHoliday) {
+                            rowClasses += " bg-blue-50/50 text-blue-600 font-bold";
+                          }
+
                           return (
-                            <tr key={idx} className={`border-b border-black/5 text-sm ${isHoliday ? 'bg-blue-50/50 text-blue-600 font-bold' : ''}`}>
+                            <tr key={idx} className={rowClasses}>
                               <td className="p-4 font-bold border">{row.day}</td>
                               <td className="p-4 opacity-70 border" dir="ltr">{row.date}</td>
                               <td className="p-2 border">
@@ -455,14 +525,27 @@ export default function App() {
                             <tr><th className="p-3 border">اليوم</th><th className="p-3 border">التاريخ</th><th className="p-3 border">ح</th><th className="p-3 border">ص</th></tr>
                           </thead>
                           <tbody>
-                            {(records as AttendanceRecord[]).map((r, i) => (
-                              <tr key={i} className="border-b border-black/5 hover:bg-black/5 transition-colors">
-                                <td className="p-3 font-bold">{r.day}</td>
-                                <td className="p-3 opacity-60">{r.date}</td>
-                                <td className="p-3">{r.checkIn}</td>
-                                <td className="p-3">{r.checkOut}</td>
-                              </tr>
-                            ))}
+                            {(records as AttendanceRecord[]).map((r, i) => {
+                              const emp = employees.find(e => e.id === r.employeeId);
+                              const isCoordinatorFriday = emp?.role === 'منسق' && r.day === 'الجمعة';
+                              const isHoliday = r.checkIn === 'اجازه';
+                              
+                              let rowClass = "border-b border-black/5 hover:bg-black/5 transition-colors";
+                              if (isCoordinatorFriday) {
+                                rowClass += " bg-gray-200 text-gray-800 font-bold";
+                              } else if (isHoliday) {
+                                rowClass += " bg-blue-50/50 text-blue-600 font-bold";
+                              }
+
+                              return (
+                                <tr key={i} className={rowClass}>
+                                  <td className="p-3 font-bold">{r.day}</td>
+                                  <td className="p-3 opacity-60">{r.date}</td>
+                                  <td className="p-3">{r.checkIn}</td>
+                                  <td className="p-3">{r.checkOut}</td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
